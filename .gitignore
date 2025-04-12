@@ -172,3 +172,19 @@ cython_debug/
 
 # PyPI configuration file
 .pypirc
+
+# === Project-specific additions ===
+
+# Raw or processed data
+data/
+*.csv
+*.json
+
+# Trained models
+*.pth
+*.pkl
+*.joblib
+
+# Evaluation outputs
+results/
+logs/

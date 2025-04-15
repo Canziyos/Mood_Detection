@@ -1,4 +1,4 @@
-## Reviewed and Recommended References
+## Reviewed and/Or Recommended References
 
 - [**Clinical practice guidelines and principles of care for people with dementia in Australia**](https://pubmed.ncbi.nlm.nih.gov/27903038/)  
   *Australian Family Physician, 2016.*
@@ -32,3 +32,6 @@
   *Computational Intelligence and Neuroscience, 2017.*  
   DOI: [10.1155/2017/2107451](https://doi.org/10.1155/2017/2107451)
 
+- [**RL-EMO: A Reinforcement Learning Framework for Multimodal Emotion Recognition**](https://ieeexplore.ieee.org/servlet/opac?punumber=10445798)  
+*ICASSP 2024 - 2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)*  
+  DOI: [10.1109/ICASSP48485.2024.10446459](https://doi.org/10.1109/ICASSP48485.2024.10446459)

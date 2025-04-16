@@ -35,3 +35,8 @@
 - [**RL-EMO: A Reinforcement Learning Framework for Multimodal Emotion Recognition**](https://ieeexplore.ieee.org/servlet/opac?punumber=10445798)  
 *ICASSP 2024 - 2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)*  
   DOI: [10.1109/ICASSP48485.2024.10446459](https://doi.org/10.1109/ICASSP48485.2024.10446459)
+
+- [**Multimodal Emotion Recognition Using Visual, Vocal and Physiological Signals: A Review**](https://www.mdpi.com/2076-3417/14/17/8071)  
+*Appl. Sci. 2024, 14(17), 8071*
+
+  DOI: [10.3390/app14178071](https://doi.org/10.3390/app14178071)

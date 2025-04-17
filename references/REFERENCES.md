@@ -41,3 +41,6 @@
 
 - [**Multimodal Emotion Recognition Using Visual, Vocal and Physiological Signals: A Review**](https://www.mdpi.com/2076-3417/14/17/8071)  
 *Appl. Sci. 2024, 14(17), 8071*
+
+- [**Crossmodal and Incremental Perception of Audiovisual Cues to Emotional Speech**](https://doi.org/10.1177/0023830909348993)  
+  Language and Speech, 2010.

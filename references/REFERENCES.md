@@ -5,22 +5,26 @@
 
 - [**Emotion Recognition Using Different Sensors, Emotion Models, Methods and Datasets: A Comprehensive Review**](https://www.mdpi.com/1424-8220/23/5/2455)  
   *Sensors, 2023.*  
-  DOI: [10.3390/s23052455](https://doi.org/10.3390/s23052455)
+
+- [**Bimodal Emotion Recognition Based on Vocal and Facial Features**](https://www.sciencedirect.com/science/article/pii/S1877050923014059)
+
+  *Procedia Computer Science Volume 225, 2023, Pages 2556-2566*
+
 
 - [**Multimodal Sentiment Analysis Using Hierarchical Fusion with Context Modeling**](https://www.sciencedirect.com/science/article/pii/S0950705118303897)  
   *Knowledge-Based Systems, 2018.*  
-  DOI: [10.1016/j.knosys.2018.07.041](https://doi.org/10.1016/j.knosys.2018.07.041)
+
 
 - [**Non-Contact Emotion Recognition Combining Heart Rate and Facial Expression for Interactive Gaming Environments**](https://doi.org/10.1109/ACCESS.2020.2964794)  
   *IEEE Access, 2020.*
 
 - [**Multimodal Emotion Detection via Attention-Based Fusion of Extracted Facial and Speech Features**](https://www.mdpi.com/1424-8220/23/12/5475)  
   *Sensors, 2023.*  
-  DOI: [10.3390/s23125475](https://doi.org/10.3390/s23125475)
+
 
 - [**A CNN-Assisted Enhanced Audio Signal Processing for Speech Emotion Recognition**](https://www.mdpi.com/1424-8220/20/1/183)  
   *Sensors, 2020.*  
-  DOI: [10.3390/s20010183](https://doi.org/10.3390/s20010183)
+ 
 
 - [**Non-Contact Dual-Modality Emotion Recognition System by CW Radar and RGB Camera**](https://doi.org/10.1109/JSEN.2021.3107429)  
   *IEEE Sensors Journal, 2021.*
@@ -30,13 +34,10 @@
 
 - [**Fusion of Facial Expressions and EEG for Multimodal Emotion Recognition**](https://onlinelibrary.wiley.com/doi/abs/10.1155/2017/2107451)  
   *Computational Intelligence and Neuroscience, 2017.*  
-  DOI: [10.1155/2017/2107451](https://doi.org/10.1155/2017/2107451)
+ 
 
 - [**RL-EMO: A Reinforcement Learning Framework for Multimodal Emotion Recognition**](https://ieeexplore.ieee.org/servlet/opac?punumber=10445798)  
 *ICASSP 2024 - 2024 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP)*  
-  DOI: [10.1109/ICASSP48485.2024.10446459](https://doi.org/10.1109/ICASSP48485.2024.10446459)
 
 - [**Multimodal Emotion Recognition Using Visual, Vocal and Physiological Signals: A Review**](https://www.mdpi.com/2076-3417/14/17/8071)  
 *Appl. Sci. 2024, 14(17), 8071*
-
-  DOI: [10.3390/app14178071](https://doi.org/10.3390/app14178071)

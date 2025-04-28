@@ -10,20 +10,18 @@
   - IIIT-H AVE
   - eNTERFACE'05
   - RML
-- Criteria:
-  - Must include both audio and video.
-  - Must cover a mix of acted (clean) and naturalistic (noisy, spontaneous) samples.
+  - etc.
 
 ## 2. Dataset Download and Organization
 
-- Download datasets from official sources or university archives.
+- Download datasets.
 - Create a metadata CSV file for each dataset:
   - Columns: Filepath | Emotion label | Speaker ID | Gender (if available) | Ethnicity | Valence (to be added later)
 
 ## 3. Subset Selection (if needed)
 
-- If a dataset is small (like RAVDESS or CREMA-D): we use the full dataset.
-- If a dataset is very large (like IEMOCAP):  we may select a representative subset.
+- If a dataset is small (small?) full dataset.
+- If a dataset is very large ():  we may select a representative subset.
   - Criteria for subset:
     - Preserve balance across emotions.
     - Preserve speaker diversity (gender, ethnicity if metadata exists).

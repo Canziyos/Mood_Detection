@@ -176,7 +176,6 @@ cython_debug/
 # === Project-specific additions ===
 
 # Raw or processed data
-data/
 *.csv
 *.json
 

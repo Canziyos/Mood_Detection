@@ -1,1 +1,1 @@
-https://www.kaggle.com/datasets/mstjebashazida/affectnet
+[Subset of AffectNet](https://www.kaggle.com/datasets/mstjebashazida/affectnet)

@@ -184,6 +184,18 @@ cython_debug/
 *.pkl
 *.joblib
 
-# Evaluation outputs
-results/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.wav
+*.npy
+data/Images/
+data/Audio/
+# Ignore logs
+*.log
 logs/
+debug_outputs/
+
+

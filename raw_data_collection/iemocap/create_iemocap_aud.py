@@ -19,11 +19,9 @@ OUTPUT_DIR = r"path_to_your\iemocap_audio"
 # frustration -> angry. excited -> happy. surprise -> happy.
 emotion_map = {
     "ang": "Angry",
-    "fru": "Angry",
     "dis": "Disgust",
     "fea": "Fear",
     "hap": "Happy",
-    "exc": "Happy",
     "sur": "Happy",
     "neu": "Neutral",
     "sad": "Sad"

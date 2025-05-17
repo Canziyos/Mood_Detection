@@ -1,6 +1,17 @@
-# Mood_Detection
+## How to Use for Fusion
 
-This project explores how different types of sensor data can be used together to detect early mood changes in elderly individuals with dementia. The aim is to support non-pharmacological care by identifying signs of agitation, depression, or other behavioral symptoms before they escalate.
+To extract features for fusion from the trained image model, use the `image_model_interface.py`.
 
-The work investigates sensor fusion techniques involving physiological signals, as well as modalities like audio and visual input. Various combinations and models will be evaluated throughout the project.
+Note: Trained model is available on [\[OneDrive link\] ](https://studentmdh-my.sharepoint.com/:f:/r/personal/lpc24001_student_mdu_se/Documents/MoodDetection_Image_Model?csf=1&web=1&e=X2xPBQ) — not included in the repo.
+ 
+### Example Usage
+
+```python
+from src.image_model_interface import extract_image_features
+
+label, softmax, embedding = extract_image_features("path/to/image.jpg")
+
+print("Label:", label)
+print("Softmax:", softmax)
+print("Embedding shape:", embedding.shape)
 

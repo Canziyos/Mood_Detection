@@ -157,7 +157,7 @@ class MobileNetV2EmotionRecognizer:
             predicted_label = self.class_names[predicted_index]
             
         # Print shape and sum for debugging
-        print("Sum of softmax output in predict:", softmax_output.sum().item())
+        # print("Sum of softmax output in predict:", softmax_output.sum().item())
         return {
             "label": predicted_label,
             "softmax": softmax_output.cpu().numpy(),

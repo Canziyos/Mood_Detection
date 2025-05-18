@@ -197,5 +197,5 @@ data/Audio/
 *.log
 logs/
 debug_outputs/
-
+emo_env/
 

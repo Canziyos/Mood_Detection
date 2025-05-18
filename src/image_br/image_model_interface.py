@@ -2,7 +2,7 @@
 
 import torch
 from PIL import Image
-from mobilenetv2_emotion_recognizer import MobileNetV2EmotionRecognizer
+from image_branch.mobilenetv2_emotion_recognizer import MobileNetV2EmotionRecognizer
 
 # Load once globally
 _model = None

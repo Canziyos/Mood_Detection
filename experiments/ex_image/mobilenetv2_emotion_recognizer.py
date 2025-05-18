@@ -10,22 +10,41 @@ import numpy as np
 import random
 
 class MobileNetV2EmotionRecognizer:
-    def __init__(self, data_dir, model_path="models/mobilenetv2_emotion.pth", batch_size=8, lr=1e-4, device=None):
+    # NOTE: Making data_dir optional and adding class_names means we can load for inference
+    # without any image folders -just give the model path and classes.
+    # If class_names is set: skip data loading, go straight to inference mode.
+    # If not: do the normal training setup with data_dir and class discovery.
+    # Now you can load the model for inference anywhere, anytime, with just the model weights and class names—no dataset circus required.
+    # To train, just give it a data_dir and let it do its thing as before.
+    # Augmentations are off for inference, so predictions are not trippy.
+    # Still grayscale all the way as before.
+    def __init__(self, data_dir=None, model_path="models/mobilenetv2_emotion.pth", batch_size=8, lr=1e-4, device=None, class_names=None):
+
         self.data_dir = data_dir
         self.model_path = model_path
         self.batch_size = batch_size
         self.lr = lr
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
-        self.transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomRotation(degrees=15),
-            transforms.RandomResizedCrop(224, scale=(0.9, 1.1), ratio=(0.9, 1.1)),
-            transforms.Grayscale(num_output_channels=1),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])
-        ])
-        self._prepare_data()
+        if class_names is not None:
+            # Inference mode: simple, no-augmentation transform
+            self.transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.5], std=[0.5])
+            ])
+            self.class_names = class_names
+            self.num_classes = len(class_names)
+        else:
+            # Training mode: augmentations galore! (like before).
+            self.transform = transforms.Compose([
+                transforms.Resize((224, 224)),
+                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomRotation(degrees=15),
+                transforms.RandomResizedCrop(224, scale=(0.9, 1.1), ratio=(0.9, 1.1)),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.5], std=[0.5])
+            ])
+            self._prepare_data()
         self._build_model()
 
     def _prepare_data(self):
@@ -66,6 +85,7 @@ class MobileNetV2EmotionRecognizer:
         patience_counter = 0
 
         for epoch in range(epochs):
+            # print("started")
             self.model.train()
             total_loss = 0
             for inputs, labels in self.train_loader:
@@ -135,8 +155,12 @@ class MobileNetV2EmotionRecognizer:
             softmax_output = torch.softmax(logits, dim=1)
             predicted_index = torch.argmax(softmax_output, dim=1).item()
             predicted_label = self.class_names[predicted_index]
+            
+        # Print shape and sum for debugging
+        print("Sum of softmax output in predict:", softmax_output.sum().item())
         return {
             "label": predicted_label,
             "softmax": softmax_output.cpu().numpy(),
             "last_hidden_layer": flattened.cpu().numpy()
         }
+    

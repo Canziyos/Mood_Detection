@@ -7,13 +7,13 @@ import imageio
 from ex_image.image_model_interface import load_image_model, extract_image_features
 from AV_Fusion import FusionAV
 
-# --- Initialize model-
+# Initialize model-
 model_path = r"../models/mobilenetv2_emotion.pth"
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 load_image_model(model_path=model_path, class_names=class_names)
 
 
-vid_path = "4.mp4"
+vid_path = r"./4.mp4"
 fusion_mode = "prod" # options: avg, prod, gate, mlp, latent
 num_classes = 6
 

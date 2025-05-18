@@ -1,18 +1,26 @@
 import torchaudio
-from audio import audio_model
+from audio import audio_to_tensor, audio_predict, load_audio_model
 
-# Load audio file (mono waveform, sample rate)
+# Load the model and device (once).
+model, device = load_audio_model() # from function 2 in audio.py
 
-test_aud = r"../Dataset/Audio/val/val_ha.wav"
-#test_aud = r"../Dataset/Audio/train/train_ang.wav"
-#test_aud = r"../Dataset/Audio/test/test_fear.wav"
+# List of test files
+test_files = [
+    r"../Dataset/Audio/val/val_ha.wav",
+    r"../Dataset/Audio/train/train_ang.wav",
+    r"../Dataset/Audio/test/test_fear.wav"
+]
 
-waveform, sample_rate = torchaudio.load(test_aud)
+# Loop and run inference. (we do not need to reload everything)
+for i, test_aud in enumerate(test_files, 1):
 
-# Forward pass
-logits, probs, features, predicted = audio_model(waveform, sample_rate)
+    print(f"\n====Testing file {i}: {test_aud} =====")
+    waveform, sample_rate = torchaudio.load(test_aud)
+    
+    img_tensor = audio_to_tensor(waveform, sample_rate) # (from function 1)
 
-print("Predicted class:", predicted)
-print("Softmax probabilities:", probs)
-print("Logits:", logits)
-print("Pre-softmax features shape:", features.shape)
+    logits, probs, features, predicted = audio_predict(model, img_tensor, device) # from func 3.
+    print("Predicted class:", predicted)
+    print("Softmax probabilities:", probs)
+    print("Logits:", logits)
+    print("Pre-softmax features shape:", features.shape)

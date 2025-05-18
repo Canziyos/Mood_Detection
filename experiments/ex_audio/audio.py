@@ -4,14 +4,22 @@ import torchaudio
 import numpy as np
 from PIL import Image
 import matplotlib.cm as cm
+# A small NOTE:
+# class_names, num_classes, and model_path are not actually used in this amazing preprocessing function
+# and do not impact any of its steps.
+# For clarity and easier maintenance, I think, it is a good idea to define them outside the function
+# and only include them where they are really needed.
+# the function name could reflect what it does, imean, it is not about model, but preprocessing
+# and preparing data for the model. so i suggest the renaming below.
 
-def audio_model(waveform, sample_rate):
-    class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
-    num_classes = len(class_names)
-    model_path = "../models/mobilenetv2_aud_68.35.pth"
+
+class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
+num_classes = len(class_names)
+model_path = r"../models/mobilenetv2_aud_68.35.pth" # Path to the model- (I renamed the model i got from you)
+
+def audio_to_tensor(waveform, sample_rate):
+    
     target_sample_rate = 16000
-
-
     # -------------------- RESAMPLE AND EXTRACT LOG MEL SPECTROGRAM --------------------------------------------
 
     # Resample if needed
@@ -57,39 +65,56 @@ def audio_model(waveform, sample_rate):
 
     # Tensor
     img_tensor = transform(spec_img).unsqueeze(0)
+    return img_tensor
 
-    # --------------------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------------------------
 
 
-    # -------------------- LOAD MODEL AND MAKE PREDICTION ----------------------------------------------
+# -------------------- LOAD MODEL AND MAKE PREDICTION ----------------------------------------------
 
-    # Load model
+# In this form, the function loads and prepares the model only once from disk.
+# Before, when it was part of the original version, the model, including its architecture and weights,
+# was reconstructed and reloaded at every run or call.
+# This way, the model is loaded just once into memory (RAM or GPU), 
+# not from disk every time, and can be reused for all predictions.
+
+def load_audio_model():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    img_tensor = img_tensor.to(device)
-
     model = models.mobilenet_v2(weights=None)
     model.classifier[1] = torch.nn.Linear(model.last_channel, num_classes)
     model.load_state_dict(torch.load(model_path, map_location=device))
     model.to(device)
     model.eval()
+    return model, device
 
-    # Prediction
+
+# The audio_predict function takes a preprocessed input tensor from the first part of the original code
+# and runs it through the loaded model via the second function. Then, as before, it produces
+#whatever it was producing.
+
+def audio_predict(model, img_tensor, device):
+    # Here is the completing step, we send the tensor
+    # to the same place (device) as the model.
+    img_tensor = img_tensor.to(device)
+
     with torch.no_grad():
 
         # Forward pass image through the model
-        output = model(img_tensor) 
-        logits = output # Output is already logits
+        output = model(img_tensor)
+        logits = output  # Output is already logits
 
         # Apply global average pooling manually to get the presoftMax-features
         features = model.features(img_tensor)
-        presoftMax = features.mean([2, 3]) # Average over the dimensions height and width, corresponding to dimensions 2 and 3
-
+        presoftMax = features.mean([2, 3])  # Average over the dimensions height and width, corresponding to dimensions 2 and 3
+        
         # Extract predicted class
-        maxLogit, predictedIdx = torch.max(output, 1) # maxLogit not used
+        # By the way, this (_) instaed of "maxLogit" is a style thing.
+        # In Python it means: I don not care about this value. :(
+        _, predictedIdx = torch.max(output, 1)
         predicted_class = class_names[predictedIdx.item()] # e.g., "Angry"
 
-        # Apply softmax to get probabilities
+        # Apply softmax to get probabilities    
         softmax = torch.nn.Softmax(dim=1)
         outSoftmax = softmax(logits)
-
     return logits, outSoftmax, presoftMax, predicted_class
+

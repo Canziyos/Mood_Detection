@@ -1,9 +1,9 @@
 
-Fusion accuracy: 0.8981
-Audio-only accuracy: 0.5626
-Image-only accuracy: 0.8787
+Fusion acc: 0.8981
+Audio-only acc: 0.5626
+Image-only acc: 0.8787
 
---- Fusion classification report ---
+--- Fusion ---
               precision    recall  f1-score   support
 
        Angry       0.88      0.92      0.90       294
@@ -18,7 +18,7 @@ Image-only accuracy: 0.8787
 weighted avg       0.90      0.90      0.90      1541
 
 
---- Audio-only classification report ---
+--- Audio-only ---
               precision    recall  f1-score   support
 
        Angry       0.92      0.54      0.68       294
@@ -33,7 +33,7 @@ weighted avg       0.90      0.90      0.90      1541
 weighted avg       0.70      0.56      0.55      1541
 
 
---- Image-only classification report ---
+--- Image-only ---
               precision    recall  f1-score   support
 
        Angry       0.84      0.89      0.87       294

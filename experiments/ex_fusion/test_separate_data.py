@@ -16,7 +16,8 @@ image_root = "../dataset/images/test"
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 
 # Set fusion mode here.
-fusion_mode = "gate"  # Change to "prod", "gate", "mlp", "latent" in other runs
+fusion_mode = "avg"  # Change to "prod", "gate", "mlp", "latent" in other runs
+
 
 audio_model, device = load_audio_model(model_path="../models/mobilenetv2_aud_68.35.pth")
 load_image_model(model_path="../models/mobilenetv2_emotion.pth", class_names=class_names)
@@ -44,28 +45,41 @@ for class_name in class_names:
         print(f"Audio pred: {pred_a} | Audio softmax: {softmax_a.tolist()} | Latent shape: {latent_a.shape}")
 
         # Image.
-        label_img, softmax_img, latent_img = extract_image_features(image_path)
-        softmax_img = torch.tensor(softmax_img, dtype=torch.float32)
-        latent_img = torch.tensor(latent_img, dtype=torch.float32).reshape(1, -1)
-        print(f"Image pred: {label_img} | Image softmax: {softmax_img.tolist()} | Latent shape: {latent_img.shape}")
+        label_i, softmax_i, logits_i, latent_i = extract_image_features(image_path)
+        softmax_i = torch.tensor(softmax_i, dtype=torch.float32)
+        latent_i = torch.tensor(latent_i, dtype=torch.float32).reshape(1, -1)
+        print(f"Image pred: {label_i} | Image softmax: {softmax_i.tolist()} | Latent shape: {latent_i.shape}")
 
-        # Fusion.
+        # Fusion model, with logits enabled
         fusion_model = FusionAV(
             num_classes=6,
             fusion_mode=fusion_mode,
             latent_dim_audio=latent_a.shape[1],
-            latent_dim_image=latent_img.shape[1]
+            latent_dim_image=latent_i.shape[1],
+            use_pre_softmax=True
         )
 
         if fusion_mode == "latent":
             fused_probs = fusion_model.fuse_probs(
-                probs_audio=softmax_a, probs_image=softmax_img,
-                latent_audio=latent_a, latent_image=latent_img
+                probs_audio=softmax_a, probs_image=softmax_i,
+                latent_audio=latent_a, latent_image=latent_i
             )
+        elif fusion_mode in ["mlp", "gate"]:
+            # You MUST pass the logits for both branches here!
+            fused_probs = fusion_model.fuse_probs(
+                probs_audio=softmax_a, probs_image=softmax_i,  # Still needed for fallback, shape checks, warnings.
+                pre_softmax_audio=logits_a, pre_softmax_image=logits_i 
+            )
+        elif fusion_mode == "avg":
+            alpha = 0.2
+            fused_probs = alpha * softmax_a + (1 - alpha) * softmax_i
+        elif fusion_mode == "prod":
+            fused_probs = (softmax_a * softmax_i) / (softmax_a * softmax_i).sum()
         else:
             fused_probs = fusion_model.fuse_probs(
-                probs_audio=softmax_a, probs_image=softmax_img
+                probs_audio=softmax_a, probs_image=softmax_i
             )
+
 
         fused_label = class_names[torch.argmax(fused_probs).item()]
         print(f"Fusion mode: {fusion_mode} | Fused pred: {fused_label} | Fused softmax: {fused_probs.tolist()}")
@@ -76,11 +90,11 @@ for class_name in class_names:
             "audio_file": audio_files[i],
             "image_file": image_files[i],
             "audio_pred": pred_a,
-            "image_pred": label_img,
+            "image_pred": label_i,
             "fusion_pred": fused_label,
             "fusion_mode": fusion_mode,
             "audio_probs": softmax_a.tolist(),
-            "image_probs": softmax_img.tolist(),
+            "image_probs": softmax_i.tolist(),
             "fusion_probs": fused_probs.tolist()
         })
 

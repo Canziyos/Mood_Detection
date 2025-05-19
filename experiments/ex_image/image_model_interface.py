@@ -44,4 +44,6 @@ def extract_image_features(image_path):
     if _model is None:
         raise RuntimeError("Model not loaded! Call load_image_model() first.")
     result = _model.predict(image_path)
-    return result["label"], result["softmax"], result["last_hidden_layer"]
+    # return result["label"], result["softmax"], result["last_hidden_layer"]
+    # updated to the following.
+    return result["label"], result["softmax"], result["logits"], result["last_hidden_layer"]

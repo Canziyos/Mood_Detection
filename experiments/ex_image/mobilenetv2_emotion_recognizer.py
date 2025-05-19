@@ -178,5 +178,6 @@ class MobileNetV2EmotionRecognizer:
         return {
             "label": predicted_label,
             "softmax": softmax_output.cpu().numpy(),
+            "logits": logits.cpu().numpy(),              #  added this.
             "last_hidden_layer": flattened.cpu().numpy()
         }

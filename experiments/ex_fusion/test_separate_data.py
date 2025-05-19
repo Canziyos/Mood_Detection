@@ -31,7 +31,7 @@ image_root = "../dataset/images/test"
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 
 # Set fusion mode here.
-fusion_mode = "gate"  # Change to "prod", "gate", "mlp", "latent" in other runs
+fusion_mode = "avg"  # Change to "prod", "gate", "mlp", "latent" in other runs
 
 
 audio_model, device = load_audio_model(model_path="../models/mobilenetv2_aud_68.35.pth")

@@ -31,7 +31,7 @@ image_root = "../dataset/images/test"
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 
 # Set fusion mode here.
-fusion_mode = "avg"  # Change to "prod", "gate", "mlp", "latent" in other runs
+fusion_mode = "latent"  # Change to "prod", "gate", "mlp", "latent" in other runs
 
 
 audio_model, device = load_audio_model(model_path="../models/mobilenetv2_aud_68.35.pth")
@@ -81,7 +81,7 @@ for class_name in class_names:
                 latent_audio=latent_a, latent_image=latent_i
             )
         elif fusion_mode in ["mlp", "gate"]:
-            # pass the logits for both branches here!
+            # We pass the logits for both branches here.
             fused_probs = fusion_model.fuse_probs(
                 probs_audio=softmax_a, probs_image=softmax_i,  # Still needed for fallback, shape checks, warnings.
                 pre_softmax_audio=logits_a, pre_softmax_image=logits_i 
@@ -114,8 +114,10 @@ for class_name in class_names:
             "fusion_probs": fused_probs.tolist()
         })
 
+out_dir = "../results"
 # Save to CSV.
-with open(f"unsync_fusion_results_{fusion_mode}.csv", "w", newline="") as f:
+with open(f"{out_dir}/unsync_fusion_results_{fusion_mode}.csv", "w", newline="") as f:
+
     fieldnames = list(results[0].keys())
     writer = csv.DictWriter(f, fieldnames=fieldnames)
     writer.writeheader()

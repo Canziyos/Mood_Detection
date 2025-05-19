@@ -6,9 +6,9 @@ model, device = load_audio_model() # from function 2 in audio.py
 
 # List of test files
 test_files = [
-    r"../Dataset/Audio/val/val_ha.wav",
-    r"../Dataset/Audio/train/train_ang.wav",
-    r"../Dataset/Audio/test/test_fear.wav"
+    r"test_samples\val_ha.wav",
+    r"test_samples\train_ang.wav",
+    r"test_samples\test_fear.wav"
 ]
 
 # Loop and run inference. (we do not need to reload everything)

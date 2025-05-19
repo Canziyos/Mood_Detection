@@ -123,9 +123,23 @@ class MobileNetV2EmotionRecognizer:
         self._build_model()
         self.model.load_state_dict(torch.load(self.model_path, map_location=self.device))
         self.model.eval()
+        
+        
+        
+    def predict(self, image_input):
+        """
+        Accepts either a file path or a numpy array as input.
+        """
+        # Determine input type and convert to PIL Image in grayscale
+        if isinstance(image_input, str):
+            image = Image.open(image_input).convert("L")
+        elif isinstance(image_input, np.ndarray):
+            if image_input.ndim == 3 and image_input.shape[2] == 1:
+                image_input = image_input.squeeze(-1)
+            image = Image.fromarray(image_input.astype(np.uint8)).convert("L")
+        else:
+            raise ValueError("Input must be a file path or a numpy array.")
 
-    def predict(self, image_path):
-        image = Image.open(image_path).convert("L")
         input_tensor = self.transform(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
             features = self.model.features(input_tensor)
@@ -140,3 +154,4 @@ class MobileNetV2EmotionRecognizer:
             "softmax": softmax_output.cpu().numpy(),
             "last_hidden_layer": flattened.cpu().numpy()
         }
+

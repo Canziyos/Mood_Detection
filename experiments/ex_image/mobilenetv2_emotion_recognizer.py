@@ -144,8 +144,28 @@ class MobileNetV2EmotionRecognizer:
         self.model.load_state_dict(torch.load(self.model_path, map_location=self.device))
         self.model.eval()
 
-    def predict(self, image_path):
-        image = Image.open(image_path).convert("L")
+        
+    def predict(self, image_input):
+        """
+        Accepts a file path (str) or a NumPy array ([H,W], [H,W,1], or [H,W,3]).
+        Always converts to grayscale as expected by the model.
+        """
+        if isinstance(image_input, str):
+            image = Image.open(image_input).convert("L")
+        elif isinstance(image_input, np.ndarray):
+            if image_input.ndim == 3:
+                if image_input.shape[2] == 1:
+                    image_input = image_input.squeeze(-1)
+                    image = Image.fromarray(image_input.astype(np.uint8)).convert("L")
+                elif image_input.shape[2] == 3:
+                    image = Image.fromarray(image_input.astype(np.uint8)).convert("L")
+                else:
+                    raise ValueError("NumPy array must have shape [H,W], [H,W,1], or [H,W,3]")
+            else:
+                image = Image.fromarray(image_input.astype(np.uint8)).convert("L")
+        else:
+            raise ValueError("Input must be a file path or a numpy array.")
+
         input_tensor = self.transform(image).unsqueeze(0).to(self.device)
         with torch.no_grad():
             features = self.model.features(input_tensor)
@@ -155,12 +175,8 @@ class MobileNetV2EmotionRecognizer:
             softmax_output = torch.softmax(logits, dim=1)
             predicted_index = torch.argmax(softmax_output, dim=1).item()
             predicted_label = self.class_names[predicted_index]
-            
-        # Print shape and sum for debugging
-        # print("Sum of softmax output in predict:", softmax_output.sum().item())
         return {
             "label": predicted_label,
             "softmax": softmax_output.cpu().numpy(),
             "last_hidden_layer": flattened.cpu().numpy()
         }
-    

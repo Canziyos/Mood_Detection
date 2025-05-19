@@ -4,7 +4,7 @@ sys.path.append(os.path.abspath('../src/fusion'))
 import numpy as np
 import torch
 import imageio
-from ex_image.image_model_interface import load_image_model, extract_image_features
+from image_model_interface import load_image_model, extract_image_features
 from AV_Fusion import FusionAV
 
 # Initialize model-
@@ -13,7 +13,7 @@ class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 load_image_model(model_path=model_path, class_names=class_names)
 
 
-vid_path = r"./4.mp4"
+vid_path = "./test_samples/4.mp4"
 fusion_mode = "prod" # options: avg, prod, gate, mlp, latent
 num_classes = 6
 

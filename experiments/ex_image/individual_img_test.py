@@ -7,9 +7,9 @@ model_path = r"../models/mobilenetv2_emotion.pth"
 load_image_model(model_path=model_path)
 
 # Test on a sample image.
-# test_img =  r"../Dataset/Images/val/val_ha.png"
-# test_img = r"../Dataset/Images/test/test_ang.png"
-test_img = r"../Dataset/Images/Train/train_sad.png"
+# test_img =  "./test_samples/val_ha.png"
+# test_img = "./test_samples/test_ang.png"
+test_img = "./test_samples/train_sad.png"
 label, softmax, emb = extract_image_features(test_img)
 
 print("Predicted label:", label)

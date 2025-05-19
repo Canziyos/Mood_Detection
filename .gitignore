@@ -191,8 +191,7 @@ cython_debug/
 *.svg
 *.wav
 *.npy
-data/Images/
-data/Audio/
+
 # Ignore logs
 *.log
 logs/

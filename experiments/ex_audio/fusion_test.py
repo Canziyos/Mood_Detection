@@ -7,25 +7,25 @@ from audio import load_audio_model, audio_to_tensor, audio_predict
 from AV_Fusion import FusionAV
 import imageio
 from moviepy import VideoFileClip
-import torchaudio
 
-# --- Config ---
-vid_path = r"./4.mp4"
-audio_path = r"./4.wav"
-fusion_mode = "avg" # options: "avg", "mlp", "gate", "prod" and "latent" (if not, avg by defult)
+# Config.
+vid_path = "./test_samples/4.mp4" 
+fusion_mode = "avg"                  # "avg", "mlp", "gate", "prod", "latent"
 num_classes = 6
 fps = 25
 img_emb_dim = 1280
 chunk_len_sec = 0.5
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 
-# Extract audio if needed.
-if not os.path.exists(audio_path):
-    video = VideoFileClip(vid_path)
-    video.audio.write_audiofile(audio_path)
+# Extract audio from the video
+video = VideoFileClip(vid_path)
+audio_array = video.audio.to_soundarray(fps=16000)
+if audio_array.ndim > 1:
+    audio_array = audio_array.mean(axis=1)
+full_waveform = torch.from_numpy(audio_array).float().unsqueeze(0)
+sr = 16000
 
-# Load audio and model (once).
-full_waveform, sr = torchaudio.load(audio_path)
+# Load audio model
 model, device = load_audio_model()
 
 def get_audio_chunk(frame_idx):
@@ -42,21 +42,20 @@ def get_audio_chunk(frame_idx):
 fusion_model = None
 reader = imageio.get_reader(vid_path)
 for frame_idx, frame in enumerate(reader):
-
     # Fake image branch for now.
-    fake_img_softmax = torch.tensor(np.random.dirichlet(np.ones(num_classes)), dtype=torch.float32) #.unsqueeze(0)
+    fake_img_softmax = torch.tensor(np.random.dirichlet(np.ones(num_classes)), dtype=torch.float32)
     fake_img_emb = torch.tensor(np.random.randn(1, img_emb_dim), dtype=torch.float32)
 
     # Real audio branch (using refactored audio.py).
     audio_chunk = get_audio_chunk(frame_idx)
     img_tensor = audio_to_tensor(audio_chunk, sr)
     logits, audio_softmax, aud_features, predicted = audio_predict(model, img_tensor, device)
-    
-    # Print logits and softmax for inspection. (i made a huge mistake before, when reviewing image brach)
+
+    # Print logits and softmax for inspection.
     print(f"Frame {frame_idx}:")
     print("- Logits:", logits.cpu().numpy())
     print("- Softmax:", audio_softmax.cpu().numpy())
-    print("- oftmax sum:", audio_softmax.sum().item())
+    print("- Softmax sum:", audio_softmax.sum().item())
     print(f"- Softmax sums to 1? {'YES' if np.allclose(audio_softmax.sum().item(), 1.0, atol=1e-5) else 'NO'}")
 
     if fusion_model is None:

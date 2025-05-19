@@ -178,7 +178,7 @@ cython_debug/
 # Raw or processed data
 *.csv
 *.json
-
+**/desktop.ini
 # Trained models
 *.pth
 *.pkl

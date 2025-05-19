@@ -198,3 +198,8 @@ logs/
 debug_outputs/
 emo_env/
 
+# exclude some files.
+results/*
+# not these:
+!results/*.png
+!results/*.txt

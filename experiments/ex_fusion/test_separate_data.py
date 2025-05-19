@@ -1,3 +1,18 @@
+# This script evaluates audio and image models on test sets non synchronised inputs
+# and fuses their predictions uing different late fusion strategies.
+
+# Set fusion_mode at the top to control which strategy to test.
+
+# Results are saved as a CSV file for later analysis.
+#
+# Audio and image files should be in class subfolders under /dataset/audio/test and /dataset/images/test.
+
+# For "gate" and "mlp", the fusion uses model logits (pre-softmax); for "latent", it uses latent features.
+# "avg" and "prod" use softmax probabilities.
+
+# For -avg- and -prod- modes, you can override the default AV_Fusion logic to apply custom weights
+# (e.g., change 'alpha' to adjust audio/image importance).
+
 import sys, os
 
 sys.path.append(os.path.abspath('../src/fusion'))

@@ -1,7 +1,7 @@
 from image_model_interface import load_image_model, extract_image_features
 
 # Path to model weights.
-model_path = r"../models/mobilenetv2_emotion.pth"
+model_path = r"../models/mobilenetv2_img.pth"
 
 # Load the model once.
 load_image_model(model_path=model_path)

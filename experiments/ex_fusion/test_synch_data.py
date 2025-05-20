@@ -52,8 +52,8 @@ video_root = "../dataset/video_test"
 fusion_mode = "gate"
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 
-audio_model, device = load_audio_model(model_path="../models/mobilenetv2_aud_68.35.pth")
-load_image_model(model_path="../models/mobilenetv2_emotion.pth", class_names=class_names)
+audio_model, device = load_audio_model(model_path="../models/mobilenetv2_aud.pth")
+load_image_model(model_path="../models/mobilenetv2_img.pth", class_names=class_names)
 
 results = []
 

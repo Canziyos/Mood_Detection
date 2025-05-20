@@ -6,7 +6,7 @@ from mobilenetv2_emotion_recognizer import MobileNetV2EmotionRecognizer
 
 if __name__ == "__main__":
     data_path = "Dataset/Images/train"
-    model_path = "models/mobilenetv2_emotion.pth"
+    model_path = "models/mobilenetv2_img.pth"
     test_image_path = "test.png" 
     recognizer = MobileNetV2EmotionRecognizer(data_dir=data_path, model_path=model_path)
 

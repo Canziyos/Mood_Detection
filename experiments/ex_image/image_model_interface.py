@@ -17,7 +17,7 @@ from mobilenetv2_emotion_recognizer import MobileNetV2EmotionRecognizer
 
 _model = None
 
-def load_image_model(model_path="models/mobilenetv2_emotion.pth", class_names=None):
+def load_image_model(model_path="models/mobilenetv2_img.pth", class_names=None):
     """
     Loads the image emotion recognition model ONCE with given weights and class names.
     For inference, pass class_names as a list.

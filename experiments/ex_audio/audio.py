@@ -15,7 +15,7 @@ import matplotlib.cm as cm
 
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 num_classes = len(class_names)
-model_path = r"../models/mobilenetv2_aud_68.35.pth" # Path to the model- (I renamed the model i got from you)
+model_path = r"../models/mobilenetv2_aud.pth" # Path to the model- (I renamed the model i got from you)
 
 def audio_to_tensor(waveform, sample_rate):
     
@@ -78,7 +78,7 @@ def audio_to_tensor(waveform, sample_rate):
 # This way, the model is loaded just once into memory (RAM or GPU), 
 # not from disk every time, and can be reused for all predictions.
 
-def load_audio_model(model_path="../models/mobilenetv2_aud_68.35.pth"):
+def load_audio_model(model_path="../models/mobilenetv2_aud.pth"):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = models.mobilenet_v2(weights=None)
     model.classifier[1] = torch.nn.Linear(model.last_channel, num_classes)

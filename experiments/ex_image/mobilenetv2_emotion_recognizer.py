@@ -18,7 +18,7 @@ class MobileNetV2EmotionRecognizer:
     # To train, just give it a data_dir and let it do its thing as before.
     # Augmentations are off for inference, so predictions are not trippy.
     # Still grayscale all the way as before.
-    def __init__(self, data_dir=None, model_path="models/mobilenetv2_emotion.pth", batch_size=8, lr=1e-4, device=None, class_names=None):
+    def __init__(self, data_dir=None, model_path="models/mobilenetv2_img.pth", batch_size=8, lr=1e-4, device=None, class_names=None):
 
         self.data_dir = data_dir
         self.model_path = model_path

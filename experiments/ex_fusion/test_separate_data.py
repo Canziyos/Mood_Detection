@@ -31,11 +31,11 @@ image_root = "../dataset/images/test"
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 
 # Set fusion mode here.
-fusion_mode = "latent"  # Change to "prod", "gate", "mlp", "latent" in other runs
+fusion_mode = "avg"  # Change to "prod", "gate", "mlp", "latent" in other runs
 
 
-audio_model, device = load_audio_model(model_path="../models/mobilenetv2_aud_68.35.pth")
-load_image_model(model_path="../models/mobilenetv2_emotion.pth", class_names=class_names)
+audio_model, device = load_audio_model(model_path="../models/mobilenetv2_aud.pth")
+load_image_model(model_path="../models/mobilenetv2_img.pth", class_names=class_names)
 
 results = []
 
@@ -50,7 +50,7 @@ for class_name in class_names:
         audio_path = os.path.join(audio_folder, audio_files[i])
         image_path = os.path.join(image_folder, image_files[i])
 
-        print(f"\nProcessing class: {class_name} | audio: {audio_files[i]} | image: {image_files[i]}")
+        # print(f"\nProcessing class: {class_name} | audio: {audio_files[i]} | image: {image_files[i]}")
 
         # Audio.
         waveform, sr = torchaudio.load(audio_path)
@@ -72,7 +72,9 @@ for class_name in class_names:
             fusion_mode=fusion_mode,
             latent_dim_audio=latent_a.shape[1],
             latent_dim_image=latent_i.shape[1],
-            use_pre_softmax=True
+            # Debugging comment-out.
+            #use_pre_softmax=True
+            use_pre_softmax=(fusion_mode in ["mlp", "gate"])
         )
 
         if fusion_mode == "latent":
@@ -87,7 +89,7 @@ for class_name in class_names:
                 pre_softmax_audio=logits_a, pre_softmax_image=logits_i 
             )
         elif fusion_mode == "avg":
-            alpha = 0.2
+            alpha = 0.5
             fused_probs = alpha * softmax_a + (1 - alpha) * softmax_i
         elif fusion_mode == "prod":
             fused_probs = (softmax_a * softmax_i) / (softmax_a * softmax_i).sum()
@@ -116,7 +118,7 @@ for class_name in class_names:
 
 out_dir = "../results"
 # Save to CSV.
-with open(f"{out_dir}/unsync_fusion_results_{fusion_mode}.csv", "w", newline="") as f:
+with open(f"{out_dir}/new_unsync_fusion_results_{fusion_mode}.csv", "w", newline="") as f:
 
     fieldnames = list(results[0].keys())
     writer = csv.DictWriter(f, fieldnames=fieldnames)

@@ -148,36 +148,48 @@ class MobileNetV2EmotionRecognizer:
         
         
     def predict(self, image_input):
-    """
-    Accepts either a file path or a numpy array as input (expects RGB).
-    """
-    # Determine input type and convert to RGB PIL Image
-    if isinstance(image_input, str):
-        image = Image.open(image_input).convert("RGB")
-    elif isinstance(image_input, np.ndarray):
-        if image_input.ndim == 2:
-            image = Image.fromarray(image_input.astype(np.uint8)).convert("RGB")  # from grayscale to RGB
-        elif image_input.ndim == 3:
-            image = Image.fromarray(image_input.astype(np.uint8)).convert("RGB")
+        """
+        Accepts either:
+        - a file path to an image, or
+        - a NumPy array (RGB or grayscale).
+        Automatically handles both grayscale and RGB inputs.
+        """
+        from PIL import Image
+
+        # Load and prepare the image
+        if isinstance(image_input, str):
+            image = Image.open(image_input)
+        elif isinstance(image_input, np.ndarray):
+            if image_input.ndim == 2:
+                image = Image.fromarray(image_input.astype(np.uint8), mode='L')
+            elif image_input.ndim == 3:
+                if image_input.shape[2] == 1:
+                    image = Image.fromarray(image_input.squeeze(-1).astype(np.uint8), mode='L')
+                elif image_input.shape[2] == 3:
+                    image = Image.fromarray(image_input.astype(np.uint8), mode='RGB')
+                else:
+                    raise ValueError("Unsupported channel format in numpy array.")
+            else:
+                raise ValueError("Unsupported numpy array shape.")
         else:
-            raise ValueError("Unsupported array shape for image input.")
-    else:
-        raise ValueError("Input must be a file path or a numpy array.")
+            raise ValueError("Input must be a file path or a numpy array.")
 
-    input_tensor = self.transform(image).unsqueeze(0).to(self.device)
+        if image.mode != "RGB":
+            image = image.convert("RGB")
 
-    with torch.no_grad():
-        features = self.model.features(input_tensor)
-        pooled = nn.AdaptiveAvgPool2d(1)(features)
-        flattened = pooled.view(pooled.size(0), -1)
-        logits = self.model.classifier(flattened)
-        softmax_output = torch.softmax(logits, dim=1)
-        predicted_index = torch.argmax(softmax_output, dim=1).item()
-        predicted_label = self.class_names[predicted_index]
+        input_tensor = self.transform(image).unsqueeze(0).to(self.device)
 
-    return {
-        "label": predicted_label,
-        "softmax": softmax_output.cpu().numpy(),
-        "last_hidden_layer": flattened.cpu().numpy()
-    }
+        with torch.no_grad():
+            features = self.model.features(input_tensor)
+            pooled = nn.AdaptiveAvgPool2d(1)(features)
+            flattened = pooled.view(pooled.size(0), -1)
+            logits = self.model.classifier(flattened)
+            softmax_output = torch.softmax(logits, dim=1)
+            predicted_index = torch.argmax(softmax_output, dim=1).item()
+            predicted_label = self.class_names[predicted_index]
 
+        return {
+            "label": predicted_label,
+            "softmax": softmax_output.cpu().numpy(),
+            "last_hidden_layer": flattened.cpu().numpy()
+        }

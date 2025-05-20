@@ -8,8 +8,8 @@ from mobilenetv2_emotion_recognizer import MobileNetV2EmotionRecognizer
 if __name__ == "__main__":
     # === Paths ===
     data_path = "../Full Dataset/Images"  # Only required if training or using ImageFolder
-    model_path = "../models/mobilenetv2_emotion.pth"
-    test_image_path = "../Full Dataset/Images/Angry/01-01-05-01-01-01-18_1.png"
+    model_path = "../../models/mobilenetv2_emotion.pth"
+    test_image_path = "../../Full Dataset/Images/Angry/01-01-05-01-01-01-18_1.png"
 
     # === (Optional) Class names for readability in report/metrics ===
     class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]

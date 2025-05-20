@@ -10,64 +10,83 @@ import numpy as np
 import random
 
 class MobileNetV2EmotionRecognizer:
-    def __init__(self, data_dir, model_path="models/mobilenetv2_emotion.pth", batch_size=8, lr=1e-4, device=None):
+    def __init__(self, data_dir, model_path="models/mobilenetv2_emotion.pth", batch_size=32, lr=3e-4, device=None):
         self.data_dir = data_dir
         self.model_path = model_path
         self.batch_size = batch_size
         self.lr = lr
         self.device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+
+        # === Data Augmentation for Robustness ===
         self.transform = transforms.Compose([
-            transforms.Resize((224, 224)),
-            transforms.RandomHorizontalFlip(p=0.5),
-            transforms.RandomRotation(degrees=15),
-            transforms.RandomResizedCrop(224, scale=(0.9, 1.1), ratio=(0.9, 1.1)),
-            transforms.Grayscale(num_output_channels=1),
+            transforms.Resize((256, 256)),  # Resize to a slightly larger size
+            transforms.RandomCrop(224),     # Then crop to 224x224 as expected by MobileNetV2
+            transforms.RandomHorizontalFlip(p=0.5),  # Adds variability, especially for facial symmetry
+            transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),  # Color variability
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.5], std=[0.5])
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],  # Standard ImageNet normalization for RGB
+                                 std=[0.229, 0.224, 0.225])
         ])
-        self._prepare_data()
+
+        self.model = None
+        self.class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
+        self.num_classes = len(self.class_names)
+
+         # Only prepare data if training is needed
+        if self.data_dir and self.data_dir != "dummy":
+         self._prepare_data()
+
+        # Build and load model
         self._build_model()
 
     def _prepare_data(self):
+        # Load dataset and apply transformations
         dataset = datasets.ImageFolder(self.data_dir, transform=self.transform)
         self.class_names = dataset.classes
         self.num_classes = len(self.class_names)
 
+        # Stratified split ensures class balance
         indices = list(range(len(dataset)))
         targets = [dataset.targets[i] for i in indices]
 
-        random.seed(42)
-        random.shuffle(indices)
-
         train_idx, val_idx = train_test_split(
-            indices,
-            test_size=0.1,
-            stratify=targets,
-            random_state=42
+            indices, test_size=0.1, stratify=targets, random_state=42
         )
 
-        self.train_loader = DataLoader(Subset(dataset, train_idx), batch_size=self.batch_size, shuffle=True)
-        self.val_loader = DataLoader(Subset(dataset, val_idx), batch_size=self.batch_size)
+        self.train_loader = DataLoader(Subset(dataset, train_idx), batch_size=self.batch_size, shuffle=True, num_workers=4)
+        self.val_loader = DataLoader(Subset(dataset, val_idx), batch_size=self.batch_size, num_workers=4)
 
     def _build_model(self):
+        # Load pretrained MobileNetV2 with ImageNet weights
         self.model = models.mobilenet_v2(weights=models.MobileNet_V2_Weights.DEFAULT)
-        self.model.features[0][0] = nn.Conv2d(1, 32, kernel_size=3, stride=2, padding=1, bias=False)
+
+        # Adjust the final classifier to match number of classes in our dataset
         self.model.classifier[1] = nn.Linear(self.model.last_channel, self.num_classes)
+
+        # Enable full fine-tuning
         for param in self.model.features.parameters():
             param.requires_grad = True
-        self.model = self.model.to(self.device)
-        self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
-        self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=5, gamma=0.5)
 
-    def train(self, epochs=20):
+        self.model = self.model.to(self.device)
+
+        # Use label smoothing to improve generalization
+        self.criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+
+        # AdamW is preferred over Adam for regularization
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=1e-4)
+
+        # Cosine learning rate schedule helps avoid getting stuck in bad local minima
+        self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=10)
+
+    def train(self, epochs=25):
         best_acc = 0
-        patience = 3
+        patience = 5
         patience_counter = 0
 
         for epoch in range(epochs):
             self.model.train()
             total_loss = 0
+
             for inputs, labels in self.train_loader:
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
                 self.optimizer.zero_grad()
@@ -82,22 +101,23 @@ class MobileNetV2EmotionRecognizer:
 
             self.scheduler.step()
 
+            # Early stopping based on validation accuracy
             if val_acc > best_acc:
                 best_acc = val_acc
                 patience_counter = 0
+                self.save_model()
             else:
                 patience_counter += 1
                 if patience_counter >= patience:
                     print("Early stopping triggered.")
                     break
 
-        self.save_model()
-
     def evaluate(self):
         self.model.eval()
         correct = 0
         total = 0
         y_true, y_pred = [], []
+
         with torch.no_grad():
             for inputs, labels in self.val_loader:
                 inputs, labels = inputs.to(self.device), labels.to(self.device)
@@ -108,6 +128,7 @@ class MobileNetV2EmotionRecognizer:
                 y_true.extend(labels.cpu().numpy())
                 y_pred.extend(preds.cpu().numpy())
 
+        # Display standard classification metrics
         print("Confusion Matrix:")
         print(confusion_matrix(y_true, y_pred))
         print("Classification Report:")
@@ -127,31 +148,36 @@ class MobileNetV2EmotionRecognizer:
         
         
     def predict(self, image_input):
-        """
-        Accepts either a file path or a numpy array as input.
-        """
-        # Determine input type and convert to PIL Image in grayscale
-        if isinstance(image_input, str):
-            image = Image.open(image_input).convert("L")
-        elif isinstance(image_input, np.ndarray):
-            if image_input.ndim == 3 and image_input.shape[2] == 1:
-                image_input = image_input.squeeze(-1)
-            image = Image.fromarray(image_input.astype(np.uint8)).convert("L")
+    """
+    Accepts either a file path or a numpy array as input (expects RGB).
+    """
+    # Determine input type and convert to RGB PIL Image
+    if isinstance(image_input, str):
+        image = Image.open(image_input).convert("RGB")
+    elif isinstance(image_input, np.ndarray):
+        if image_input.ndim == 2:
+            image = Image.fromarray(image_input.astype(np.uint8)).convert("RGB")  # from grayscale to RGB
+        elif image_input.ndim == 3:
+            image = Image.fromarray(image_input.astype(np.uint8)).convert("RGB")
         else:
-            raise ValueError("Input must be a file path or a numpy array.")
+            raise ValueError("Unsupported array shape for image input.")
+    else:
+        raise ValueError("Input must be a file path or a numpy array.")
 
-        input_tensor = self.transform(image).unsqueeze(0).to(self.device)
-        with torch.no_grad():
-            features = self.model.features(input_tensor)
-            pooled = nn.AdaptiveAvgPool2d(1)(features)
-            flattened = pooled.view(pooled.size(0), -1)
-            logits = self.model.classifier(flattened)
-            softmax_output = torch.softmax(logits, dim=1)
-            predicted_index = torch.argmax(softmax_output, dim=1).item()
-            predicted_label = self.class_names[predicted_index]
-        return {
-            "label": predicted_label,
-            "softmax": softmax_output.cpu().numpy(),
-            "last_hidden_layer": flattened.cpu().numpy()
-        }
+    input_tensor = self.transform(image).unsqueeze(0).to(self.device)
+
+    with torch.no_grad():
+        features = self.model.features(input_tensor)
+        pooled = nn.AdaptiveAvgPool2d(1)(features)
+        flattened = pooled.view(pooled.size(0), -1)
+        logits = self.model.classifier(flattened)
+        softmax_output = torch.softmax(logits, dim=1)
+        predicted_index = torch.argmax(softmax_output, dim=1).item()
+        predicted_label = self.class_names[predicted_index]
+
+    return {
+        "label": predicted_label,
+        "softmax": softmax_output.cpu().numpy(),
+        "last_hidden_layer": flattened.cpu().numpy()
+    }
 

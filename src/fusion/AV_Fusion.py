@@ -1,14 +1,13 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 class FusionAV(nn.Module):
     """
     Late fusion module for audio + image branches.
     Supported fusion modes:
         - "avg"    : weighted average of probabilities.
-        - "gate"   : learned scalar weight per sample (logits only).
-        - "latent" : Linear classifier on concatenated latent vectors (dims inferred if not provided).
+        - "gate"   : learned scalar weight per sample (logits only or logits+latents).
+        - "latent" : Linear classifier on concatenated latent vectors.
     """
 
     def __init__(
@@ -22,7 +21,7 @@ class FusionAV(nn.Module):
     ):
         super().__init__()
 
-        assert fusion_mode in {"avg", "gate", "latent"}, "Invalid fusion mode."
+        assert fusion_mode in {"avg", "gate", "hybrid", "latent"}, "Invalid fusion mode."
         self.fusion_mode = fusion_mode
         self.alpha = alpha
 
@@ -32,12 +31,16 @@ class FusionAV(nn.Module):
             use_pre_softmax = True
         self.use_pre_softmax = use_pre_softmax
 
-        # Dynamic latent dims (None means infer at first use)
         self.latent_dim_audio = latent_dim_audio
         self.latent_dim_image = latent_dim_image
 
         if fusion_mode == "gate":
-            in_dim = 2 * num_classes
+            if latent_dim_audio is not None and latent_dim_image is not None:
+                in_dim = 2 * num_classes + latent_dim_audio + latent_dim_image
+                self.use_latent_in_gate = True
+            else:
+                in_dim = 2 * num_classes
+                self.use_latent_in_gate = False
             self.gate_fc = nn.Linear(in_dim, 1)
         elif fusion_mode == "latent":
             # Do not create latent_fc yet if dims not known.
@@ -84,7 +87,10 @@ class FusionAV(nn.Module):
         elif self.fusion_mode == "gate":
             if pre_softmax_audio is None or pre_softmax_image is None:
                 raise ValueError("FusionAV-gate mode, you must provide pre_softmax_audio and pre_softmax_image (logits) as inputs.")
-            x = torch.cat([pre_softmax_audio, pre_softmax_image], dim=1)
+            if getattr(self, 'use_latent_in_gate', False) and latent_audio is not None and latent_image is not None:
+                x = torch.cat([pre_softmax_audio, pre_softmax_image, latent_audio, latent_image], dim=1)
+            else:
+                x = torch.cat([pre_softmax_audio, pre_softmax_image], dim=1)
             alpha = torch.sigmoid(self.gate_fc(x))
             out = alpha * probs_audio + (1 - alpha) * probs_image
             if return_gate:
@@ -105,70 +111,3 @@ class FusionAV(nn.Module):
             raise ValueError(f"Unsupported fusion mode: {self.fusion_mode}")
 
         return out
-
-
-if __name__ == "__main__":
-    import torch
-
-    batch_size = 4
-    num_classes = 6
-    latent_dim_audio = 1280
-    latent_dim_image = 1280
-
-    # ---- AVG ---#
-    print("\nTesting 'avg' fusion:")
-    fusion_avg = FusionAV(
-        num_classes=num_classes,
-        fusion_mode="avg",
-        alpha=0.5
-    )
-    probs_audio = torch.softmax(torch.randn(batch_size, num_classes), dim=1)
-    probs_image = torch.softmax(torch.randn(batch_size, num_classes), dim=1)
-    output_avg = fusion_avg.fuse_probs(
-        probs_audio=probs_audio,
-        probs_image=probs_image
-    )
-    print("Out-shape (avg):", output_avg.shape)
-    print("Output (avg):\n", output_avg)
-
-    # ---- Gate (logits input) ---#
-    print("\nTesting 'gate' fusion (logits input):")
-    fusion_gate_logits = FusionAV(
-        num_classes=num_classes,
-        fusion_mode="gate",
-        use_pre_softmax=True
-    )
-    logits_audio = torch.randn(batch_size, num_classes)
-    logits_image = torch.randn(batch_size, num_classes)
-    probs_audio = torch.softmax(logits_audio, dim=1)
-    probs_image = torch.softmax(logits_image, dim=1)
-    output_gate_logits = fusion_gate_logits.fuse_probs(
-        probs_audio=probs_audio,
-        probs_image=probs_image,
-        pre_softmax_audio=logits_audio,
-        pre_softmax_image=logits_image,
-        return_gate=True
-    )
-    print("Out-shape (gate logits):", output_gate_logits[0].shape)
-    print("Output (gate logits):\n", output_gate_logits[0])
-    print("Alphas (gate logits):\n", output_gate_logits[1].squeeze())
-
-    # --- Latent ---#
-    print("\nTesting 'latent' fusion:")
-    fusion_latent = FusionAV(
-        num_classes=num_classes,
-        fusion_mode="latent",
-        latent_dim_audio=latent_dim_audio,
-        latent_dim_image=latent_dim_image
-    )
-    latent_audio = torch.randn(batch_size, latent_dim_audio)
-    latent_image = torch.randn(batch_size, latent_dim_image)
-    output_latent = fusion_latent.fuse_probs(
-        probs_audio=None,
-        probs_image=None,
-        latent_audio=latent_audio,
-        latent_image=latent_image
-    )
-    print("Out-Shape (latent):", output_latent.shape)
-    print("Output (latent):\n", output_latent)
-

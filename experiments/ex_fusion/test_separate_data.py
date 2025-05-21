@@ -17,7 +17,7 @@ audio_root = "./Dataset/audio/test"
 image_root = "./Dataset/images/test"
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 
-# ==== SET FUSION MODE HERE ====
+# Set fusion mode here.
 fusion_mode = "gate"  # "avg", "gate", or "latent"
 
 audio_model, device = load_audio_model(model_path="./models/mobilenetv2_aud.pth")
@@ -74,7 +74,7 @@ for class_name in class_names:
         softmax_a = softmax_a.to(device)
         latent_a = latent_a.to(device)
         
-        # === FUSION ===
+        # === Fusion ===#
         if fusion_mode == "avg":
             alpha = 0.5
             fused_probs = alpha * softmax_a + (1 - alpha) * softmax_i

@@ -14,7 +14,7 @@ from dataloader import FusionPairDataset, HybridFusionPairDataset
 
 
 
-# ==== EXPERIMENT SETTINGS (CHANGE THESE ONLY) ====
+# Experimenting settings (Change These only).
 fusion_mode = "hybrid"   # "gate", "latent", or "hybrid"
 latent_dim = 1280        # latent vector dim
 num_classes = 6
@@ -27,9 +27,9 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 results_dir = "./models"
 os.makedirs(results_dir, exist_ok=True)
 
-# ========== DATA & MODEL SELECTION ==========
+# Data & Model Selection.
 if fusion_mode == "gate":
-    # Gate on logits only
+    # Gate on logits only.
     train_dataset = FusionPairDataset("./logits/audio/train", "./logits/images/train", class_names)
     val_dataset   = FusionPairDataset("./logits/audio/val",   "./logits/images/val",   class_names)
     fusion_head = FusionAV(num_classes=num_classes, fusion_mode="gate").to(device)
@@ -37,7 +37,7 @@ if fusion_mode == "gate":
     val_loader   = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     train_type = "gate"
 elif fusion_mode == "latent":
-    # Latent head on latents only
+    # Latent head on latents only.
     train_dataset = FusionPairDataset("./latent/audio/train", "./latent/images/train", class_names)
     val_dataset   = FusionPairDataset("./latent/audio/val",   "./latent/images/val",   class_names)
     fusion_head = FusionAV(num_classes=num_classes, fusion_mode="latent",

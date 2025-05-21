@@ -13,17 +13,17 @@ from src.fusion.AV_Fusion import FusionAV
 from sklearn.metrics import classification_report, confusion_matrix
 from dataloader import FusionPairDataset, HybridFusionPairDataset
 
-# ============ SETTINGS ============
+# Settings.
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 num_classes = len(class_names)
 batch_size = 32
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# ==== SELECT FUSION MODE ====
+# Select fusion.
 fusion_mode = "hybrid"    # "gate", "latent", or "hybrid"
 model_file = "./models/best_gate_hybrid_head.pth"  # change as needed
 
-# ==== PREPARE MODEL AND DATA ====
+# Prepare model & data.
 if fusion_mode == "gate":
     audio_dir = "./logits/audio/test"
     image_dir = "./logits/images/test"
@@ -56,7 +56,7 @@ elif fusion_mode == "latent":
     )
     loader_mode = "latent"
 elif fusion_mode == "hybrid":
-    # expects both logits and latent dirs
+    # expects both logits and latent dirs.
     fusion_head = FusionAV(
         num_classes=num_classes,
         fusion_mode="gate",
@@ -80,7 +80,7 @@ print(f"Loaded fusion head from: {model_file}")
 
 test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-# ========== RUN TEST ============
+# Run tests
 test_preds, test_trues = [], []
 
 test_preds, test_trues = [], []
@@ -133,7 +133,7 @@ with torch.no_grad():
         test_audio_preds.extend(audio_preds.cpu().numpy())
         test_image_preds.extend(image_preds.cpu().numpy())
 
-# ========== RESULTS ============
+# === RESULTS === #
 print(f"\nClassification report on test set ({fusion_mode} head):")
 print(classification_report(test_trues, test_preds, target_names=class_names))
 print("\nConfusion Matrix:")

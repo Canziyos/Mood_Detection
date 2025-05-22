@@ -8,20 +8,21 @@ if project_root not in sys.path:
 import torch
 import torchaudio
 import numpy as np
-from experiments.ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
+from experiments.ex_audio.audio import load_audio_model, audio_predict
 from experiments.ex_image.image_model_interface import load_image_model, extract_image_features
 from src.fusion.AV_Fusion import FusionAV
 import csv
 
-audio_root = "./Dataset/audio/test"
-image_root = "./Dataset/images/test"
+audio_root = "./Dataset/Audio/test"
+image_root = "./Dataset/Images/test"
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 
 # Set fusion mode here.
-fusion_mode = "gate"  # "avg", "gate", or "latent"
+fusion_mode = "avg"  # "avg", "gate", or "latent"
 
-audio_model, device = load_audio_model(model_path="./models/mobilenetv2_aud.pth")
-load_image_model(model_path="./models/mobilenetv2_img.pth", class_names=class_names)
+audio_model, device = load_audio_model(model_path="./models/mobilenetv2_aud_TrainedOnFullDataset_71.09.pth")
+#load_image_model(model_path="./models/mobilenetv2_img.pth", class_names=class_names)
+load_image_model(model_path="./models/mobilenetv2_img.pth", data_dir="dummy")
 print("models loaded.")
 fusion_model = None
 if fusion_mode == "gate":
@@ -53,7 +54,8 @@ results = []
 for class_name in class_names:
     audio_folder = os.path.join(audio_root, class_name)
     image_folder = os.path.join(image_root, class_name)
-    audio_files = sorted([f for f in os.listdir(audio_folder) if f.endswith('.wav')])
+    #audio_files = sorted([f for f in os.listdir(audio_folder) if f.endswith('.wav')])
+    audio_files = sorted([f for f in os.listdir(audio_folder) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
     image_files = sorted([f for f in os.listdir(image_folder) if f.lower().endswith(('.jpg', '.jpeg', '.png'))])
     n_pairs = min(len(audio_files), len(image_files))
     print(f"  Audio files: {len(audio_files)} | Image files: {len(image_files)} | Pairing up: {n_pairs} samples.")
@@ -62,9 +64,9 @@ for class_name in class_names:
         audio_path = os.path.join(audio_folder, audio_files[i])
         image_path = os.path.join(image_folder, image_files[i])
 
-        waveform, sr = torchaudio.load(audio_path)
-        aud_tensor = audio_to_tensor(waveform, sr)
-        logits_a, softmax_a, latent_a, pred_a = audio_predict(audio_model, aud_tensor, device)
+        #waveform, sr = torchaudio.load(audio_path)
+        #aud_tensor = audio_to_tensor(waveform, sr)
+        logits_a, softmax_a, latent_a, pred_a = audio_predict(audio_model, audio_path, device)
 
         label_i, softmax_i, logits_i, latent_i = extract_image_features(image_path)
         softmax_i = torch.tensor(softmax_i, dtype=torch.float32).to(device)
@@ -110,7 +112,7 @@ for class_name in class_names:
 out_dir = "./results"
 os.makedirs(out_dir, exist_ok=True)
 
-save_path = f"{out_dir}/unsync_fusion_results_{fusion_mode}.csv"
+save_path = f"{out_dir}/NEWunsync_fusion_results_{fusion_mode}.csv"
 with open(save_path, "w", newline="") as f:
     fieldnames = list(results[0].keys())
     writer = csv.DictWriter(f, fieldnames=fieldnames)

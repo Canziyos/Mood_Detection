@@ -6,9 +6,9 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from experiments.ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
-from experiments.ex_image.image_model_interface import load_image_model
-from src.fusion.AV_Fusion import FusionAV
+from experiments.ex_fusion.audio import load_audio_model, audio_to_tensor, audio_predict
+from experiments.ex_fusion.image_model_interface import load_image_model
+from src.fusion.AudioImageFusion import FusionAV
 
 # Config.
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
@@ -38,10 +38,7 @@ elif fusion_type == "gate":
     ckpt = torch.load(ckpt_path, map_location=device)
     fusion_head = FusionAV(
         num_classes=len(class_names),
-        fusion_mode="gate",
-        latent_dim_audio=None,
-        latent_dim_image=None,
-        use_latents=False
+        fusion_mode="gate"
     ).to(device)
     fusion_head.load_state_dict(ckpt["state_dict"])
     fusion_head.eval()
@@ -75,7 +72,6 @@ with torch.no_grad():
             # Simulate image down: Set image logits and probs to zeros.
             logits_i = torch.zeros_like(logits_a)
             probs_i = torch.zeros_like(probs_a)
-            # Optionally: Make image prediction always "Unknown" or "None"
             lab_i = "IMG_DOWN"
 
             logits_a = logits_a.to(device)
@@ -98,8 +94,6 @@ with torch.no_grad():
                     probs_image=probs_i,
                     pre_softmax_audio=logits_a,
                     pre_softmax_image=logits_i,
-                    latent_audio=None,
-                    latent_image=None,
                     return_gate=True
                 )
                 alpha_a, alpha_i = alpha[:, 0], alpha[:, 1]
@@ -139,6 +133,5 @@ mean_a = np.mean(alpha_a_list) if alpha_a_list else 0
 mean_i = np.mean(alpha_i_list) if alpha_i_list else 0
 print(f"\nAlpha audio (mean): {mean_a:.3f}   |   Alpha image (mean): {mean_i:.3f}")
 
-# Save results.
 pd.DataFrame(records).to_csv(csv_path, index=False)
 print(f"\nResults written to {csv_path}")

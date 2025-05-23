@@ -4,10 +4,9 @@ from collections import deque
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path: sys.path.insert(0, ROOT)
 
-from experiments.ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
-from experiments.ex_image.image_model_interface import load_image_model, extract_image_features
-from src.fusion.AV_Fusion import FusionAV
-
+from experiments.ex_fusion.audio import load_audio_model, audio_to_tensor, audio_predict
+from experiments.ex_fusion.image_model_interface import load_image_model, extract_image_features
+from src.fusion.old_AV_Fusion import FusionAV
 
 fusion_mode = "avg"
 alfa = 0.3
@@ -19,13 +18,12 @@ num_win = 10
 classes = ["Angry","Disgust","Fear","Happy","Neutral","Sad"]
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
 aud_model, _ = load_audio_model("./models/mobilenetv2_aud.pth")
 image_model = load_image_model("./models/mobilenetv2_img.pth")
+
 if fusion_mode == "gate":
     fusion_head = FusionAV(
-        num_classes=len(classes), fusion_mode="gate",
-        latent_dim_audio=None, latent_dim_image=None, use_latents=False
+        num_classes=len(classes), fusion_mode="gate"
     ).to(device)
     fusion_head.load_state_dict(torch.load("./models/best_gate_head_logits.pth", map_location=device)["state_dict"])
     fusion_head.eval()
@@ -96,8 +94,6 @@ def run_fusion():
                     probs_image=mean_probs_i,
                     pre_softmax_audio=mean_logits_a,
                     pre_softmax_image=mean_logits_i,
-                    latent_audio=None,
-                    latent_image=None,
                     return_gate=True
                 )
                 fused_label = classes[int(torch.argmax(fused_probs))]

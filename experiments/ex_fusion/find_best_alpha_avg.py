@@ -8,9 +8,9 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from experiments.ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
-from experiments.ex_image.image_model_interface import load_image_model, extract_image_features
-from src.fusion.AV_Fusion import FusionAV
+from experiments.ex_fusion.audio import load_audio_model, audio_to_tensor, audio_predict
+from experiments.ex_fusion.image_model_interface import load_image_model, extract_image_features
+from src.fusion.old_AV_Fusion import FusionAV
 
 class_names   = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 audio_root    = "./dataset/audio/train"

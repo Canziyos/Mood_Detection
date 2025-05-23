@@ -3,7 +3,7 @@ import sys, os
 sys.path.append(os.path.dirname(__file__))
 import torch
 from PIL import Image
-from mobilenetv2_emotion_recognizer import MobileNetV2EmotionRecognizer
+from experiments.ex_fusion.mobilenetv2_emotion_recognizer import MobileNetV2EmotionRecognizer
 
 
 # === Global cache for the model instance ===

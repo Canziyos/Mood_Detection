@@ -7,8 +7,8 @@ if project_root not in sys.path:
 
 import torchaudio
 import numpy as np
-from experiments.ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
-from experiments.ex_image.image_model_interface import load_image_model, extract_image_features
+from experiments.ex_fusion.audio import load_audio_model, audio_to_tensor, audio_predict
+from experiments.ex_fusion.image_model_interface import load_image_model, extract_image_features
 
 audio_model, device = load_audio_model(model_path="./models/mobilenetv2_aud.pth")
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]

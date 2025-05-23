@@ -1,14 +1,13 @@
 import os, sys, torch, numpy as np, random
 from torch.utils.data import DataLoader
 
-# repo path hack.
+# Repo path hack.
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from src.fusion.AV_Fusion import FusionAV
+from src.fusion.AudioImageFusion import AudioImageFusion  # Make sure this is the correct (clean, logits-only) version!
 from dataloader import FlexibleFusionDataset, ConflictValDataset
-
 
 seed = 42
 torch.manual_seed(seed)
@@ -17,18 +16,14 @@ random.seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark     = False
 
-# Best Params From Grid Search #
-use_latents       = False           # logits-only, no latents.
-latent_dim        = None            # not used.
+# Params
 batch_size        = 32
 epochs            = 150
 patience          = 15
-gate_hidden       = 32              # Ignored by single-layer, kept for tracking.
-oversample_audio  = False           # NO oversampling, per best config!
+oversample_audio  = False
 frac_conflict     = 0.3
-lam_kl            = 0.0
-lam_entropy       = 0.01            # Best config.
-lam_prefer_image  = 0.05            # Best config.
+lam_entropy       = 0.01
+lam_prefer_image  = 0.05
 lr                = 1e-3
 
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
@@ -43,18 +38,14 @@ train_ds = FlexibleFusionDataset(
     logits_audio_dir="./logits/audio/train",
     logits_image_dir="./logits/images/train",
     class_names=class_names,
-    latent_audio_dir=None,
-    latent_image_dir=None,
     pair_mode=False,
-    oversample_audio=oversample_audio  # Set to False!
+    oversample_audio=oversample_audio
 )
 
 val_ds = ConflictValDataset(
     logits_audio_dir="./logits/audio/val",
     logits_image_dir="./logits/images/val",
     class_names=class_names,
-    latent_audio_dir=None,
-    latent_image_dir=None,
     frac_conflict=frac_conflict
 )
 
@@ -62,13 +53,9 @@ train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
 
 # MODEL.
-fusion_head = FusionAV(
+fusion_head = AudioImageFusion(
     num_classes=num_classes,
     fusion_mode="gate",
-    latent_dim_audio=None,
-    latent_dim_image=None,
-    use_latents=False,
-    gate_hidden=gate_hidden  # Ignored, kept for logging.
 ).to(device)
 
 # OPTIM / LOSSES.
@@ -90,7 +77,6 @@ for ep in range(1, epochs + 1):
             probs_audio=torch.softmax(logits_a, dim=1),
             probs_image=torch.softmax(logits_i, dim=1),
             pre_softmax_audio=logits_a, pre_softmax_image=logits_i,
-            latent_audio=None, latent_image=None,
             return_gate=True
         )
         ce = ce_criterion(logits_f, y)
@@ -115,7 +101,6 @@ for ep in range(1, epochs + 1):
                 probs_audio=torch.softmax(logits_a, dim=1),
                 probs_image=torch.softmax(logits_i, dim=1),
                 pre_softmax_audio=logits_a, pre_softmax_image=logits_i,
-                latent_audio=None, latent_image=None,
                 return_gate=True
             )
             val_loss += ce_criterion(logits_f, y).item() * y.size(0)
@@ -133,11 +118,11 @@ for ep in range(1, epochs + 1):
           f"train {train_loss:.4f} | val {val_loss:.4f} | acc {val_acc:.4f} "
           f"| mean alpha_a {mean_alpha_a:.3f} | mean alpha_i {mean_alpha_i:.3f} | lr {scheduler.get_last_lr()[0]:.6f}")
 
-    # Early brake.
+    # Early stop.
     if val_loss < best_val - 1e-5:
         best_val, bad_epochs = val_loss, 0
         best_state = fusion_head.state_dict()
-        torch.save({"state_dict": best_state, "use_latents": use_latents}, ckpt)
+        torch.save({"state_dict": best_state}, ckpt)
     else:
         bad_epochs += 1
         if bad_epochs >= patience:

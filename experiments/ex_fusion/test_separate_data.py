@@ -9,27 +9,23 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from experiments.ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
-from experiments.ex_image.image_model_interface import load_image_model, extract_image_features
-from src.fusion.AV_Fusion import FusionAV
+from audio import load_audio_model, audio_to_tensor, audio_predict
+from image_model_interface import load_image_model, extract_image_features
+from src.fusion.AudioImageFusion import FusionAV
 
-#Config-
+# Config-
 class_names   = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
-audio_root    = "./dataset/audio/test"
+audio_root    = "./dataset/audio/EmoDB_audio_test"
 image_root    = "./dataset/images/test"
 
 fusion_type = "gate"   # "avg" or "gate".
-alpha = 0.3   # 0.2, 0.3, 0.4  # weight for audio in "avg" mode.
+alpha = 0.3   # Only used if fusion_type="avg".
 
 ckpt_path = "./models/best_gate_head_logits.pth"
-latent_dim = None   # Logits only.
-use_latents = False # Force logits-only.
-
 out_dir  = "./results"
 os.makedirs(out_dir, exist_ok=True)
 csv_path = f"{out_dir}/unsync_compare_{fusion_type}_logits.csv"
 device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 # Load base models.
 audio_model, _ = load_audio_model(model_path="./models/mobilenetv2_aud.pth")
@@ -48,10 +44,7 @@ elif fusion_type == "gate":
     ckpt = torch.load(ckpt_path, map_location="cpu")
     fusion_head = FusionAV(
         num_classes=len(class_names),
-        fusion_mode="gate",
-        latent_dim_audio=None,
-        latent_dim_image=None,
-        use_latents=False
+        fusion_mode="gate"
     ).to(device)
     fusion_head.load_state_dict(ckpt["state_dict"])
     fusion_head.eval()
@@ -106,11 +99,8 @@ with torch.no_grad():
                     probs_image=probs_i,
                     pre_softmax_audio=logits_a,
                     pre_softmax_image=logits_i,
-                    latent_audio=None,
-                    latent_image=None,
                     return_gate=True
                 )
-                # Gate logic: always returns B x 2.
                 alpha_a, alpha_i = alpha[:, 0], alpha[:, 1]
                 alpha_weights = torch.stack([alpha_a, alpha_i], dim=1)
             else:
@@ -151,5 +141,4 @@ print(f"\nalfa audio (mean): {mean_a:.3f}   |   alfa image (mean): {mean_i:.3f}"
 
 # Save csv.
 pd.DataFrame(records).to_csv(csv_path, index=False)
-print(f"\n Results written to {csv_path}")
-
+print(f"\nResults written to {csv_path}")

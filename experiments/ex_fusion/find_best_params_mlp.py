@@ -11,7 +11,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from src.fusion.AV_Fusion import FusionAV
+from src.fusion.old_AV_Fusion import FusionAV
 from dataloader import FlexibleFusionDataset, ConflictValDataset
 
 # --------------------------------------------------------------#

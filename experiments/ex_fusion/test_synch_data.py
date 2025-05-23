@@ -1,7 +1,6 @@
-import os, warnings, cv2, torch, numpy as np, pandas as pd, torchaudio
+import os, warnings, cv2, torch, numpy as np, pandas as pd
 from moviepy import VideoFileClip
 from PIL import Image
-
 
 video_path   = "experiments/test_samples/4.mp4"
 audio_model  = "./models/mobilenetv2_aud.pth"
@@ -10,20 +9,19 @@ gate_ckpt    = "./models/best_gate_head_logits.pth"
 csv_out      = "./results/clip_fusion.csv"
 
 # hyper-params #
-frames_num     = 10           # frames per clip
-audio_win_s  = 1.0         # seconds of audio centred on each frame
-classes      = ["Angry","Disgust","Fear","Happy","Neutral","Sad"]
-fusion_type  = "avg"      # "avg" or "gate"
-alfa        = 0.3         # Only used if fusion_type="avg".
-
+frames_num     = 10         # frames per clip.
+audio_win_s    = 1.0        # seconds of audio centred on each frame.
+classes        = ["Angry","Disgust","Fear","Happy","Neutral","Sad"]
+fusion_type    = "avg"      # "avg" or "gate"
+alfa           = 0.3        # Only used if fusion_type="avg"
 
 import sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path: sys.path.insert(0, ROOT)
 
-from experiments.ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
-from experiments.ex_image.image_model_interface import load_image_model, extract_image_features
-from src.fusion.AV_Fusion import FusionAV
+from experiments.ex_fusion.audio import load_audio_model, audio_to_tensor, audio_predict
+from experiments.ex_fusion.image_model_interface import load_image_model, extract_image_features
+from src.fusion.old_AV_Fusion import FusionAV
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -43,10 +41,7 @@ elif fusion_type == "gate":
     ckpt = torch.load(gate_ckpt, map_location=device)
     fusion_head = FusionAV(
         num_classes=len(classes),
-        fusion_mode="gate",
-        latent_dim_audio=None,
-        latent_dim_image=None,
-        use_latents=False
+        fusion_mode="gate"
     ).to(device)
     fusion_head.load_state_dict(ckpt["state_dict"])
     fusion_head.eval()
@@ -157,10 +152,10 @@ records.append(dict(
 # Save results.
 os.makedirs(os.path.dirname(csv_out), exist_ok=True)
 pd.DataFrame(records).to_csv(csv_out, index=False)
-print(f"\n✓ Saved results to {csv_out}")
+print(f"\n Saved results to {csv_out}")
 
 print(f"\nPredictions for {video_name}:")
-print(f" - Audio    : {classes[int(np.argmax(pa))]}")
+print(f"- Audio    : {classes[int(np.argmax(pa))]}")
 print(f"- Image     : {classes[int(np.argmax(pi))]}")
 print(f"- Fusion    : {classes[int(np.argmax(pf))]}")
 print(f"- Audio Prob: {pa.round(3)}")

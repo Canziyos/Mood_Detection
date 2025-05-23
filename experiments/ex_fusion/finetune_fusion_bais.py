@@ -8,7 +8,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from src.fusion.AV_Fusion import FusionAV
+from src.fusion.AudioImageFusion import FusionAV
 from dataloader import FlexibleFusionDataset, ConflictValDataset
 
 seed = 42
@@ -19,12 +19,10 @@ torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark     = False
 
 # Config.
-use_latents = False
-latent_dim = None
 batch_size = 32
 epochs = 150
 patience = 15
-gate_hidden = 32
+gate_hidden = 32  # Kept for compatibility/logging, not used
 oversample_audio  = False
 frac_conflict = 0.3
 lam_kl = 0.0
@@ -53,8 +51,6 @@ for lam_prefer_image in lam_prefer_image_grid:
             logits_audio_dir="./logits/audio/train",
             logits_image_dir="./logits/images/train",
             class_names=class_names,
-            latent_audio_dir=None,
-            latent_image_dir=None,
             pair_mode=False,
             oversample_audio=oversample_audio
         )
@@ -62,8 +58,6 @@ for lam_prefer_image in lam_prefer_image_grid:
             logits_audio_dir="./logits/audio/val",
             logits_image_dir="./logits/images/val",
             class_names=class_names,
-            latent_audio_dir=None,
-            latent_image_dir=None,
             frac_conflict=frac_conflict
         )
         train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
@@ -72,11 +66,7 @@ for lam_prefer_image in lam_prefer_image_grid:
         # Model.
         fusion_head = FusionAV(
             num_classes=num_classes,
-            fusion_mode="gate",
-            latent_dim_audio=None,
-            latent_dim_image=None,
-            use_latents=False,
-            gate_hidden=gate_hidden
+            fusion_mode="gate"
         ).to(device)
 
         optimizer  = torch.optim.Adam(fusion_head.parameters(), lr=lr)
@@ -100,11 +90,9 @@ for lam_prefer_image in lam_prefer_image_grid:
                     probs_audio=torch.softmax(logits_a, dim=1),
                     probs_image=torch.softmax(logits_i, dim=1),
                     pre_softmax_audio=logits_a, pre_softmax_image=logits_i,
-                    latent_audio=None, latent_image=None,
                     return_gate=True
                 )
                 ce = ce_criterion(logits_f, y)
-                # Encourage more image gating (+ sign: Reward more image).
                 prefer_image = alpha[:, 1].mean()
                 entropy = -(alpha * (torch.log(alpha + 1e-8))).sum(dim=1).mean()
                 loss = ce - lam_prefer_image * prefer_image - lam_entropy * entropy
@@ -115,7 +103,7 @@ for lam_prefer_image in lam_prefer_image_grid:
             train_loss = running / len(train_loader.dataset)
             scheduler.step()
 
-            # Validare.
+            # Validate.
             fusion_head.eval()
             val_loss, correct, total, alpha_a_vals, alpha_i_vals = 0.0, 0, 0, [], []
             with torch.no_grad():
@@ -125,7 +113,6 @@ for lam_prefer_image in lam_prefer_image_grid:
                         probs_audio=torch.softmax(logits_a, dim=1),
                         probs_image=torch.softmax(logits_i, dim=1),
                         pre_softmax_audio=logits_a, pre_softmax_image=logits_i,
-                        latent_audio=None, latent_image=None,
                         return_gate=True
                     )
                     val_loss += ce_criterion(logits_f, y).item() * y.size(0)
@@ -148,7 +135,7 @@ for lam_prefer_image in lam_prefer_image_grid:
             if val_loss < best_val - 1e-5:
                 best_val, bad_epochs = val_loss, 0
                 best_state = fusion_head.state_dict()
-                torch.save({"state_dict": best_state, "use_latents": use_latents}, ckpt)
+                torch.save({"state_dict": best_state}, ckpt)
             else:
                 bad_epochs += 1
                 if bad_epochs >= patience:

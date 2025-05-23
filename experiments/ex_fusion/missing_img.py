@@ -1,42 +1,32 @@
-# --------------------------------------------------------------------------------#
-# Unsynchronized audio/image fusion test (LOGITS-ONLY, supports "avg" and "gate") #
-# --------------------------------------------------------------------------------#
 import sys, os, torch, torchaudio, numpy as np, pandas as pd
 from sklearn.metrics import classification_report, confusion_matrix
 
-# Add project root to sys.path for local imports
+# Add project root to sys.path for local imports.
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from experiments.ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
-from experiments.ex_image.image_model_interface import load_image_model, extract_image_features
+from experiments.ex_image.image_model_interface import load_image_model
 from src.fusion.AV_Fusion import FusionAV
 
-#Config-
-class_names   = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
-audio_root    = "./dataset/audio/test"
-image_root    = "./dataset/images/test"
-
-fusion_type = "gate"   # "avg" or "gate".
-alpha = 0.3   # 0.2, 0.3, 0.4  # weight for audio in "avg" mode.
-
+# Config.
+class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
+audio_root = "./EmoDB_For_AudioTest"
+image_down = True  # Simulate image missing/down.
+fusion_type = "gate"  # "gate" or "avg".
+alpha = 0.3  # Only used if fusion_type="avg".
 ckpt_path = "./models/best_gate_head_logits.pth"
-latent_dim = None   # Logits only.
-use_latents = False # Force logits-only.
-
-out_dir  = "./results"
+out_dir = "./results"
 os.makedirs(out_dir, exist_ok=True)
-csv_path = f"{out_dir}/unsync_compare_{fusion_type}_logits.csv"
-device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+csv_path = f"{out_dir}/unsync_compare_{fusion_type}_imgdown.csv"
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-# Load base models.
+# Load models.
 audio_model, _ = load_audio_model(model_path="./models/mobilenetv2_aud.pth")
-image_model = load_image_model(model_path="./models/mobilenetv2_img.pth")
-print("Audio & image backbones loaded.")
+print("Audio backbone loaded.")
 
-# Load fusion model according to mode:
+# Load fusion model.
 if fusion_type == "avg":
     fusion_head = FusionAV(
         num_classes=len(class_names),
@@ -45,7 +35,7 @@ if fusion_type == "avg":
     ).to(device)
     print(f"FusionAV loaded for avg fusion (alpha={alpha}).")
 elif fusion_type == "gate":
-    ckpt = torch.load(ckpt_path, map_location="cpu")
+    ckpt = torch.load(ckpt_path, map_location=device)
     fusion_head = FusionAV(
         num_classes=len(class_names),
         fusion_mode="gate",
@@ -66,32 +56,34 @@ alpha_a_list, alpha_i_list = [], []
 with torch.no_grad():
     for cname in class_names:
         a_dir = os.path.join(audio_root, cname)
-        i_dir = os.path.join(image_root, cname)
-        if not os.path.exists(a_dir) or not os.path.exists(i_dir):
-            print(f"Skipping class '{cname}' (missing folder).")
+        if not os.path.exists(a_dir):
+            print(f"Skipping class '{cname}' (missing audio folder).")
             continue
 
         a_files = sorted([f for f in os.listdir(a_dir) if f.endswith(".wav")])
-        i_files = sorted([f for f in os.listdir(i_dir) if f.lower().endswith(('.jpg', '.png', '.jpeg'))])
-        N = min(len(a_files), len(i_files))
+        N = len(a_files)
         if N == 0:
-            print(f"Skipping class '{cname}' (no paired files).")
+            print(f"Skipping class '{cname}' (no audio files).")
             continue
 
         for idx in range(N):
-            # audio forward.
+            # Audio forward.
             wav, sr = torchaudio.load(os.path.join(a_dir, a_files[idx]))
             aud_t = audio_to_tensor(wav, sr)
             logits_a, probs_a, _, pred_a = audio_predict(audio_model, aud_t, device)
 
-            # image forward.
-            lab_i, probs_i, logits_i, _ = extract_image_features(os.path.join(i_dir, i_files[idx]))
-            logits_i = torch.tensor(logits_i, dtype=torch.float32).to(device)
-            probs_i  = torch.tensor(probs_i,  dtype=torch.float32).to(device)
-            logits_a = logits_a.to(device)
-            probs_a  = probs_a.to(device)
+            # Simulate image down: Set image logits and probs to zeros.
+            logits_i = torch.zeros_like(logits_a)
+            probs_i = torch.zeros_like(probs_a)
+            # Optionally: Make image prediction always "Unknown" or "None"
+            lab_i = "IMG_DOWN"
 
-            # fuse (using FusionAV in both modes).
+            logits_a = logits_a.to(device)
+            probs_a = probs_a.to(device)
+            logits_i = logits_i.to(device)
+            probs_i = probs_i.to(device)
+
+            # Fusion.
             if fusion_type == "avg":
                 fused_probs = fusion_head.fuse_probs(
                     probs_audio=probs_a,
@@ -110,7 +102,6 @@ with torch.no_grad():
                     latent_image=None,
                     return_gate=True
                 )
-                # Gate logic: always returns B x 2.
                 alpha_a, alpha_i = alpha[:, 0], alpha[:, 1]
                 alpha_weights = torch.stack([alpha_a, alpha_i], dim=1)
             else:
@@ -121,7 +112,7 @@ with torch.no_grad():
             # Bookkeeping.
             y_true.append(class_names.index(cname))
             y_a.append(class_names.index(pred_a))
-            y_i.append(class_names.index(lab_i))
+            y_i.append(-1)  # Not a real class, since image is missing.
             y_f.append(class_names.index(pred_f))
             alpha_a_list.append(alpha_weights[0, 0].item())
             alpha_i_list.append(alpha_weights[0, 1].item())
@@ -129,27 +120,25 @@ with torch.no_grad():
             records.append({
                 "class": cname,
                 "audio_file": a_files[idx],
-                "image_file": i_files[idx],
-                "audio_pred": pred_a,
                 "image_pred": lab_i,
                 "fusion_pred": pred_f,
                 "alpha_audio": alpha_weights[0, 0].item(),
                 "alpha_image": alpha_weights[0, 1].item(),
             })
 
-        print(f"[{cname}] paired {N} samples (audio {len(a_files)}/ image {len(i_files)})")
+        print(f"[{cname}] audio-only {N} samples.")
 
-# Metrics.
-print("\n=== AUDIO vs IMAGE vs FUSION ===")
-for name, y_hat in [("Audio", y_a), ("Image", y_i), ("Fusion", y_f)]:
-    print(f"\n{name} report:")
-    print(classification_report(y_true, y_hat, target_names=class_names, digits=3))
+# Metrics & Save.
+print("\n=== AUDIO-ONLY vs FUSION (Image Down) ===")
+print("\nAudio report:")
+print(classification_report(y_true, y_a, target_names=class_names, digits=3))
+print("\nFusion report:")
+print(classification_report(y_true, y_f, target_names=class_names, digits=3))
 
 mean_a = np.mean(alpha_a_list) if alpha_a_list else 0
 mean_i = np.mean(alpha_i_list) if alpha_i_list else 0
-print(f"\nalfa audio (mean): {mean_a:.3f}   |   alfa image (mean): {mean_i:.3f}")
+print(f"\nAlpha audio (mean): {mean_a:.3f}   |   Alpha image (mean): {mean_i:.3f}")
 
-# Save csv.
+# Save results.
 pd.DataFrame(records).to_csv(csv_path, index=False)
-print(f"\n Results written to {csv_path}")
-
+print(f"\nResults written to {csv_path}")

@@ -1,197 +1,150 @@
-import sys
-import os
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-import sys
-import os
-import numpy as np
-import torch
+import os, sys, torch, numpy as np, random
 from torch.utils.data import DataLoader
+
+# repo path hack.
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
 from src.fusion.AV_Fusion import FusionAV
-from dataloader import FusionPairDataset, HybridFusionPairDataset
+from dataloader import FlexibleFusionDataset, ConflictValDataset
 
 
+seed = 42
+torch.manual_seed(seed)
+np.random.seed(seed)
+random.seed(seed)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark     = False
 
-# Experimenting settings (Change These only).
-fusion_mode = "hybrid"   # "gate", "latent", or "hybrid"
-latent_dim = 1280        # latent vector dim
-num_classes = 6
-batch_size = 32
-epochs = 50
-patience = 8
+# Best Params From Grid Search #
+use_latents       = False           # logits-only, no latents.
+latent_dim        = None            # not used.
+batch_size        = 32
+epochs            = 150
+patience          = 15
+gate_hidden       = 32              # Ignored by single-layer, kept for tracking.
+oversample_audio  = False           # NO oversampling, per best config!
+frac_conflict     = 0.3
+lam_kl            = 0.0
+lam_entropy       = 0.01            # Best config.
+lam_prefer_image  = 0.05            # Best config.
+lr                = 1e-3
 
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+num_classes = len(class_names)
+
 results_dir = "./models"
 os.makedirs(results_dir, exist_ok=True)
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Data & Model Selection.
-if fusion_mode == "gate":
-    # Gate on logits only.
-    train_dataset = FusionPairDataset("./logits/audio/train", "./logits/images/train", class_names)
-    val_dataset   = FusionPairDataset("./logits/audio/val",   "./logits/images/val",   class_names)
-    fusion_head = FusionAV(num_classes=num_classes, fusion_mode="gate").to(device)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader   = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    train_type = "gate"
-elif fusion_mode == "latent":
-    # Latent head on latents only.
-    train_dataset = FusionPairDataset("./latent/audio/train", "./latent/images/train", class_names)
-    val_dataset   = FusionPairDataset("./latent/audio/val",   "./latent/images/val",   class_names)
-    fusion_head = FusionAV(num_classes=num_classes, fusion_mode="latent",
-                           latent_dim_audio=latent_dim, latent_dim_image=latent_dim).to(device)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader   = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    train_type = "latent"
-elif fusion_mode == "hybrid":
-    # Gate head on logits + latents
-    train_dataset = HybridFusionPairDataset(
-        logits_audio_dir="./logits/audio/train", logits_image_dir="./logits/images/train",
-        latent_audio_dir="./latent/audio/train", latent_image_dir="./latent/images/train",
-        class_names=class_names)
-    val_dataset = HybridFusionPairDataset(
-        logits_audio_dir="./logits/audio/val", logits_image_dir="./logits/images/val",
-        latent_audio_dir="./latent/audio/val", latent_image_dir="./latent/images/val",
-        class_names=class_names)
-    fusion_head = FusionAV(num_classes=num_classes, fusion_mode="gate",
-                           latent_dim_audio=latent_dim, latent_dim_image=latent_dim).to(device)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader   = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    train_type = "hybrid"
-else:
-    raise ValueError("fusion_mode must be 'gate', 'latent', or 'hybrid'.")
+# Datasets
+train_ds = FlexibleFusionDataset(
+    logits_audio_dir="./logits/audio/train",
+    logits_image_dir="./logits/images/train",
+    class_names=class_names,
+    latent_audio_dir=None,
+    latent_image_dir=None,
+    pair_mode=False,
+    oversample_audio=oversample_audio  # Set to False!
+)
 
-optimizer = torch.optim.Adam(fusion_head.parameters(), lr=1e-3)
-criterion = torch.nn.CrossEntropyLoss()
+val_ds = ConflictValDataset(
+    logits_audio_dir="./logits/audio/val",
+    logits_image_dir="./logits/images/val",
+    class_names=class_names,
+    latent_audio_dir=None,
+    latent_image_dir=None,
+    frac_conflict=frac_conflict
+)
 
-best_val_loss = float("inf")
-epochs_no_improve = 0
-best_state = None
-history = {"train_loss": [], "val_loss": [], "val_acc": []}
+train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
+val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
 
-for epoch in range(epochs):
+# MODEL.
+fusion_head = FusionAV(
+    num_classes=num_classes,
+    fusion_mode="gate",
+    latent_dim_audio=None,
+    latent_dim_image=None,
+    use_latents=False,
+    gate_hidden=gate_hidden  # Ignored, kept for logging.
+).to(device)
+
+# OPTIM / LOSSES.
+optimizer  = torch.optim.Adam(fusion_head.parameters(), lr=lr)
+scheduler  = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
+ce_criterion = torch.nn.CrossEntropyLoss()
+
+best_val, bad_epochs, best_state = float("inf"), 0, None
+ckpt = f"{results_dir}/best_gate_head_logits.pth"
+for ep in range(1, epochs + 1):
     fusion_head.train()
-    total_loss = 0.0
-    print(f"Epoch {epoch+1}/{epochs}: Training...")
-    for batch_idx, batch in enumerate(train_loader):
+    running = 0.0
+
+    for logits_a, logits_i, _, _, y in train_loader:
+        logits_a, logits_i, y = logits_a.to(device), logits_i.to(device), y.to(device)
+
         optimizer.zero_grad()
-        if train_type == "gate":
-            X_a, X_i, y = [t.to(device) for t in batch]
-            softmax_a = torch.softmax(X_a, dim=1)
-            softmax_i = torch.softmax(X_i, dim=1)
-            logits = fusion_head.fuse_probs(
-                probs_audio=softmax_a,
-                probs_image=softmax_i,
-                pre_softmax_audio=X_a,
-                pre_softmax_image=X_i,
-                return_logits=True
-            )
-        elif train_type == "latent":
-            X_a, X_i, y = [t.to(device) for t in batch]
-            logits = fusion_head.fuse_probs(
-                probs_audio=None,
-                probs_image=None,
-                latent_audio=X_a,
-                latent_image=X_i,
-                return_logits=True
-            )
-        elif train_type == "hybrid":
-            logits_a, logits_i, lat_a, lat_i, y = [t.to(device) for t in batch]
-            softmax_a = torch.softmax(logits_a, dim=1)
-            softmax_i = torch.softmax(logits_i, dim=1)
-            logits = fusion_head.fuse_probs(
-                probs_audio=softmax_a,
-                probs_image=softmax_i,
-                pre_softmax_audio=logits_a,
-                pre_softmax_image=logits_i,
-                latent_audio=lat_a,
-                latent_image=lat_i,
-                return_logits=True
-            )
-        loss = criterion(logits, y)
+        logits_f, alpha = fusion_head.fuse_probs(
+            probs_audio=torch.softmax(logits_a, dim=1),
+            probs_image=torch.softmax(logits_i, dim=1),
+            pre_softmax_audio=logits_a, pre_softmax_image=logits_i,
+            latent_audio=None, latent_image=None,
+            return_gate=True
+        )
+        ce = ce_criterion(logits_f, y)
+        prefer_image = alpha[:, 1].mean()
+        gate_entropy = -(alpha * (torch.log(alpha + 1e-8))).sum(dim=1).mean()
+        loss = ce + lam_prefer_image * prefer_image + lam_entropy * gate_entropy
+
         loss.backward()
         optimizer.step()
-        total_loss += loss.item() * (logits.shape[0])
-        if (batch_idx + 1) % 10 == 0 or (batch_idx + 1) == len(train_loader):
-            print(f"  Training batch {batch_idx+1}/{len(train_loader)}")
-    avg_loss = total_loss / len(train_loader.dataset)
-    history["train_loss"].append(avg_loss)
+        running += loss.item() * y.size(0)
 
-    # Validation
+    train_loss = running / len(train_loader.dataset)
+    scheduler.step()
+
+    # Validate.
     fusion_head.eval()
-    val_loss = 0.0
-    correct = 0
-    total = 0
-    val_preds, val_trues = [], []
-    print(f"Epoch {epoch+1}/{epochs}: Validating...")
+    val_loss, correct, total, alpha_a_vals, alpha_i_vals = 0.0, 0, 0, [], []
     with torch.no_grad():
-        for batch_idx, batch in enumerate(val_loader):
-            if train_type == "gate":
-                X_a, X_i, y = [t.to(device) for t in batch]
-                softmax_a = torch.softmax(X_a, dim=1)
-                softmax_i = torch.softmax(X_i, dim=1)
-                logits = fusion_head.fuse_probs(
-                    probs_audio=softmax_a,
-                    probs_image=softmax_i,
-                    pre_softmax_audio=X_a,
-                    pre_softmax_image=X_i,
-                    return_logits=True
-                )
-            elif train_type == "latent":
-                X_a, X_i, y = [t.to(device) for t in batch]
-                logits = fusion_head.fuse_probs(
-                    probs_audio=None,
-                    probs_image=None,
-                    latent_audio=X_a,
-                    latent_image=X_i,
-                    return_logits=True
-                )
-            elif train_type == "hybrid":
-                logits_a, logits_i, lat_a, lat_i, y = [t.to(device) for t in batch]
-                softmax_a = torch.softmax(logits_a, dim=1)
-                softmax_i = torch.softmax(logits_i, dim=1)
-                logits = fusion_head.fuse_probs(
-                    probs_audio=softmax_a,
-                    probs_image=softmax_i,
-                    pre_softmax_audio=logits_a,
-                    pre_softmax_image=logits_i,
-                    latent_audio=lat_a,
-                    latent_image=lat_i,
-                    return_logits=True
-                )
-            loss = criterion(logits, y)
-            val_loss += loss.item() * (logits.shape[0])
-            preds = torch.argmax(logits, dim=1)
-            val_preds.extend(preds.cpu().numpy())
-            val_trues.extend(y.cpu().numpy())
-            correct += (preds == y).sum().item()
-            total += y.size(0)
-            if (batch_idx + 1) % 10 == 0 or (batch_idx + 1) == len(val_loader):
-                print(f"  Validation batch {batch_idx+1}/{len(val_loader)}")
-    val_loss = val_loss / len(val_loader.dataset)
-    val_acc = correct / total
-    history["val_loss"].append(val_loss)
-    history["val_acc"].append(val_acc)
+        for logits_a, logits_i, _, _, y in val_loader:
+            logits_a, logits_i, y = logits_a.to(device), logits_i.to(device), y.to(device)
+            logits_f, alpha = fusion_head.fuse_probs(
+                probs_audio=torch.softmax(logits_a, dim=1),
+                probs_image=torch.softmax(logits_i, dim=1),
+                pre_softmax_audio=logits_a, pre_softmax_image=logits_i,
+                latent_audio=None, latent_image=None,
+                return_gate=True
+            )
+            val_loss += ce_criterion(logits_f, y).item() * y.size(0)
+            correct  += (logits_f.argmax(1) == y).sum().item()
+            total    += y.size(0)
+            alpha_a_vals.extend(alpha[:, 0].detach().cpu().tolist())
+            alpha_i_vals.extend(alpha[:, 1].detach().cpu().tolist())
 
-    print(f"Epoch {epoch+1}/{epochs}: Train loss {avg_loss:.4f} | Val loss {val_loss:.4f} | Val acc {val_acc:.4f}")
+    val_loss /= len(val_loader.dataset)
+    val_acc   = correct / total
+    mean_alpha_a = np.mean(alpha_a_vals) if alpha_a_vals else 0
+    mean_alpha_i = np.mean(alpha_i_vals) if alpha_i_vals else 0
 
-    if val_loss < best_val_loss - 1e-5:
-        best_val_loss = val_loss
+    print(f"Ep {ep:03}: "
+          f"train {train_loss:.4f} | val {val_loss:.4f} | acc {val_acc:.4f} "
+          f"| mean alpha_a {mean_alpha_a:.3f} | mean alpha_i {mean_alpha_i:.3f} | lr {scheduler.get_last_lr()[0]:.6f}")
+
+    # Early brake.
+    if val_loss < best_val - 1e-5:
+        best_val, bad_epochs = val_loss, 0
         best_state = fusion_head.state_dict()
-        epochs_no_improve = 0
-        head_type = "gate" if train_type == "gate" else "latent" if train_type == "latent" else "gate_hybrid"
-        torch.save(best_state, f"{results_dir}/best_{head_type}_head.pth")
+        torch.save({"state_dict": best_state, "use_latents": use_latents}, ckpt)
     else:
-        epochs_no_improve += 1
-        if epochs_no_improve >= patience:
-            print(f"Stop at epoch {epoch+1}. Best val loss: {best_val_loss:.4f}")
+        bad_epochs += 1
+        if bad_epochs >= patience:
+            print("Early stopping.")
             break
 
-if best_state is not None:
+# Load best.
+if best_state:
     fusion_head.load_state_dict(best_state)
-    print("Best weights loaded.")
-
-if head_type:
-    print(f"Saved best weights to: {os.path.abspath(f'{results_dir}/best_{head_type}_head.pth')}")
+    print(f"Best model re-loaded (val loss {best_val:.4f}, acc {val_acc:.4f}).")

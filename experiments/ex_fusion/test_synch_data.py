@@ -1,142 +1,168 @@
-import sys, os, csv
-sys.path.append(os.path.abspath('../src/fusion'))
-sys.path.append(os.path.abspath('.'))
-
-import cv2
+import os, warnings, cv2, torch, numpy as np, pandas as pd, torchaudio
 from moviepy import VideoFileClip
-import numpy as np
 from PIL import Image
-from ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
-from ex_image.image_model_interface import load_image_model, extract_image_features
-from AV_Fusion import FusionAV
-import torch
 
-import os
+
+video_path   = "experiments/test_samples/4.mp4"
+audio_model  = "./models/mobilenetv2_aud.pth"
+image_model  = "./models/mobilenetv2_img.pth"
+gate_ckpt    = "./models/best_gate_head_logits.pth"
+csv_out      = "./results/clip_fusion.csv"
+
+# hyper-params #
+frames_num     = 10           # frames per clip
+audio_win_s  = 1.0         # seconds of audio centred on each frame
+classes      = ["Angry","Disgust","Fear","Happy","Neutral","Sad"]
+fusion_type  = "avg"      # "avg" or "gate"
+alfa        = 0.3         # Only used if fusion_type="avg".
+
+
 import sys
-from contextlib import contextmanager
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+if ROOT not in sys.path: sys.path.insert(0, ROOT)
 
-# this part has nothing to do with fusion pipeline.
-#-------------------------------------------------#
-@contextmanager
-def suppress_stdout_stderr():
-    with open(os.devnull, 'w') as devnull:
-        old_stdout = sys.stdout
-        old_stderr = sys.stderr
-        sys.stdout = devnull
-        sys.stderr = devnull
-        try:
-            yield
-        finally:
-            sys.stdout = old_stdout
-            sys.stderr = old_stderr
-# -------------------------------------------------#
+from experiments.ex_audio.audio import load_audio_model, audio_to_tensor, audio_predict
+from experiments.ex_image.image_model_interface import load_image_model, extract_image_features
+from src.fusion.AV_Fusion import FusionAV
 
-# Face detection util.
-def detect_and_crop_face(img):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-    if len(faces) == 0:
-        h, w, _ = img.shape
-        sz = min(h, w)
-        startx = w//2 - sz//2
-        starty = h//2 - sz//2
-        face_img = img[starty:starty+sz, startx:startx+sz]
-    else:
-        x, y, w, h = max(faces, key=lambda f: f[2]*f[3])
-        face_img = img[y:y+h, x:x+w]
-    face_img = cv2.resize(face_img, (224, 224))
-    return Image.fromarray(cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB))
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-video_root = "../dataset/video_test"
-fusion_mode = "gate"
-class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
+# Load models.
+audio_model, _ = load_audio_model(audio_model)
+image_model = load_image_model(image_model)
 
-audio_model, device = load_audio_model(model_path="../models/mobilenetv2_aud.pth")
-load_image_model(model_path="../models/mobilenetv2_img.pth", class_names=class_names)
+# Load fusion head.
+if fusion_type == "avg":
+    fusion_head = FusionAV(
+        num_classes=len(classes),
+        fusion_mode="avg",
+        alpha=alfa
+    ).to(device)
+    print(f"FusionAV loaded for avg fusion (alpha={alfa}).")
+elif fusion_type == "gate":
+    ckpt = torch.load(gate_ckpt, map_location=device)
+    fusion_head = FusionAV(
+        num_classes=len(classes),
+        fusion_mode="gate",
+        latent_dim_audio=None,
+        latent_dim_image=None,
+        use_latents=False
+    ).to(device)
+    fusion_head.load_state_dict(ckpt["state_dict"])
+    fusion_head.eval()
+    print("Gate head loaded (logits-only).")
+else:
+    raise ValueError(f"Unknown fusion_type: {fusion_type}")
 
-results = []
+# helpers.
+def pick_frames(cap, n):
+    tot = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    idxs = np.linspace(0, tot-1, n, dtype=int)
+    frames = []
+    for i in idxs:
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(i))
+        ok, fr = cap.read()
+        if ok: frames.append((i, fr.copy()))
+    return frames
 
-for class_name in class_names:
-    video_folder = os.path.join(video_root, class_name)
-    video_files = sorted([f for f in os.listdir(video_folder) if f.lower().endswith('.avi')])
+def central_square(img):
+    h, w, _ = img.shape
+    sz = min(h, w)
+    return cv2.resize(img[h//2-sz//2:h//2+sz//2, w//2-sz//2:w//2+sz//2], (224, 224))
 
-    for vid_file in video_files:
-        video_path = os.path.join(video_folder, vid_file)
-        print(f"\nProcessing class: {class_name} | video: {vid_file}")
+def audio_slice(wav, sr, center, win):
+    half = int(win*sr/2)
+    c    = int(center*sr)
+    s, e = max(c-half, 0), min(c+half, wav.shape[-1])
+    chunk = wav[..., s:e]
+    if chunk.shape[-1] < win*sr:
+        pad = win*sr - chunk.shape[-1]
+        chunk = torch.nn.functional.pad(chunk, (0, int(pad)))
+    return chunk
 
-        # Extract audio (suppressed output)
-        with suppress_stdout_stderr():
-            clip = VideoFileClip(video_path)
-            audio_array = clip.audio.to_soundarray(fps=16000)
-        if audio_array.ndim > 1:
-            audio_array = audio_array.mean(axis=1)
-        waveform = torch.from_numpy(audio_array).float().unsqueeze(0)
-        sr = 16000
+# main loop.
+records = []
 
-        # Extract faces.
-        vidcap = cv2.VideoCapture(video_path)
-        total_frames = int(vidcap.get(cv2.CAP_PROP_FRAME_COUNT))
-        frame_id = total_frames // 2
-        vidcap.set(cv2.CAP_PROP_POS_FRAMES, frame_id)
-        ret, frame = vidcap.read()
-        vidcap.release()
-        if not ret:
-            print("Could not read frame from video, skipping.")
-            continue
-        face_pil = detect_and_crop_face(frame)
+# Handle single video.
+video_name = os.path.basename(video_path)
+print(f"Processing {video_name}")
 
-        # Audio inference.
-        aud_tensor = audio_to_tensor(waveform, sr)
-        logits_a, softmax_a, latent_a, pred_a = audio_predict(audio_model, aud_tensor, device)
+clip = VideoFileClip(video_path, audio=True)
+sr = 16000
+aud_np = clip.audio.to_soundarray(fps=sr).mean(axis=1)   # mono.
+wav = torch.from_numpy(aud_np).unsqueeze(0)              # (1, T)
 
-        
-        # Image inference.
-        face_pil = detect_and_crop_face(frame)
-        face_np = np.array(face_pil)  # Convert PIL Image to NumPy array. (img model modified to accept path & np array)
-        label_img, softmax_img, latent_img = extract_image_features(face_np)
-        softmax_img = torch.tensor(softmax_img, dtype=torch.float32)
-        latent_img = torch.tensor(latent_img, dtype=torch.float32).reshape(1, -1)
+cap = cv2.VideoCapture(video_path)
+samples = pick_frames(cap, frames_num)
+cap.release()
+if not samples:
+    warnings.warn(f"No frames in {video_name}, skipping.")
 
+pa, pi, pf = [], [], []
 
-        # Fusion.
-        fusion_model = FusionAV(
-            num_classes=6,
-            fusion_mode=fusion_mode,
-            latent_dim_audio=latent_a.shape[1],
-            latent_dim_image=latent_img.shape[1]
+for idx, frame in samples:
+    t_sec = clip.duration * idx / clip.reader.n_frames   # timestamp.
+
+    # audio branch.
+    chunk = audio_slice(wav, sr, t_sec, audio_win_s)
+    chunk = chunk.float()
+    aud_t = audio_to_tensor(chunk, sr)
+    logits_a, probs_a, _, _ = audio_predict(audio_model, aud_t, device)
+
+    # Image branch.
+    crop = central_square(frame)
+    lab_i, probs_i, logits_i, _ = extract_image_features(crop)
+    logits_i = torch.tensor(logits_i, dtype=torch.float32, device=device)
+    probs_i  = torch.tensor(probs_i,  dtype=torch.float32, device=device)
+    logits_a = logits_a.to(device)
+    probs_a  = probs_a.to(device)
+
+    # Fusion.
+    if fusion_type == "avg":
+        fused_probs = fusion_head.fuse_probs(
+            probs_audio=probs_a,
+            probs_image=probs_i,
+            pre_softmax_audio=logits_a,
+            pre_softmax_image=logits_i
         )
-        if fusion_mode == "latent":
-            fused_probs = fusion_model.fuse_probs(
-                probs_audio=softmax_a, probs_image=softmax_img,
-                latent_audio=latent_a, latent_image=latent_img
-            )
-        else:
-            fused_probs = fusion_model.fuse_probs(
-                probs_audio=softmax_a, probs_image=softmax_img
-            )
+    elif fusion_type == "gate":
+        fused_probs, _ = fusion_head.fuse_probs(
+            probs_audio=probs_a,
+            probs_image=probs_i,
+            pre_softmax_audio=logits_a,
+            pre_softmax_image=logits_i,
+            return_gate=True
+        )
+    else:
+        raise ValueError(f"Unknown fusion_type: {fusion_type}")
 
-        fused_label = class_names[torch.argmax(fused_probs).item()]
-        print(f"Fusion mode: {fusion_mode} | Fused pred: {fused_label}")
+    pa.append(probs_a.detach().cpu().numpy())
+    pi.append(probs_i.detach().cpu().numpy())
+    pf.append(fused_probs.detach().cpu().numpy())
 
-        results.append({
-            "class": class_name,
-            "video_file": vid_file,
-            "audio_pred": pred_a,
-            "image_pred": label_img,
-            "fusion_pred": fused_label,
-            "fusion_mode": fusion_mode,
-            "audio_probs": softmax_a.tolist(),
-            "image_probs": softmax_img.tolist(),
-            "fusion_probs": fused_probs.tolist()
-        })
+pa = np.mean(np.vstack(pa), axis=0)
+pi = np.mean(np.vstack(pi), axis=0)
+pf = np.mean(np.vstack(pf), axis=0)
 
-# Save to CSV
-with open(f"sync_fusion_results_{fusion_mode}.csv", "w", newline="") as f:
-    fieldnames = list(results[0].keys())
-    writer = csv.DictWriter(f, fieldnames=fieldnames)
-    writer.writeheader()
-    for row in results:
-        writer.writerow(row)
+records.append(dict(
+    video_file  = video_name,
+    audio_pred  = classes[int(np.argmax(pa))],
+    image_pred  = classes[int(np.argmax(pi))],
+    fusion_pred = classes[int(np.argmax(pf))],
+    audio_probs = pa.tolist(),
+    image_probs = pi.tolist(),
+    fusion_probs= pf.tolist()
+))
 
-print(f"Done. Saved results for {fusion_mode}.")
+# Save results.
+os.makedirs(os.path.dirname(csv_out), exist_ok=True)
+pd.DataFrame(records).to_csv(csv_out, index=False)
+print(f"\n✓ Saved results to {csv_out}")
+
+print(f"\nPredictions for {video_name}:")
+print(f" - Audio    : {classes[int(np.argmax(pa))]}")
+print(f"- Image     : {classes[int(np.argmax(pi))]}")
+print(f"- Fusion    : {classes[int(np.argmax(pf))]}")
+print(f"- Audio Prob: {pa.round(3)}")
+print(f"- Image Prob: {pi.round(3)}")
+print(f"- Fusion Prb: {pf.round(3)}")

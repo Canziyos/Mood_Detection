@@ -3,7 +3,7 @@
 # --------------------------------------------------------------------------------
 
 import sys, os, torch, torchaudio, numpy as np, pandas as pd
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report
 from datetime import datetime
 
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
@@ -14,7 +14,7 @@ from audio import load_audio_model, audio_to_tensor, audio_predict
 from image_model_interface import load_image_model, extract_image_features
 from AudioImageFusion import AudioImageFusion
 
-# --- Normalization constants (MUST match your training/grid search) ---
+# Normalization constants (Must match training/grid search)
 AUDIO_LOGITS_STD = 5.11
 IMAGE_LOGITS_STD = 1.58
 
@@ -97,11 +97,11 @@ with torch.no_grad():
             logits_a = logits_a.to(device)
             probs_a  = probs_a.to(device)
 
-            # === Normalize logits for gate ===
+            # Normalize logits for gate.
             norm_logits_a = logits_a / AUDIO_LOGITS_STD
             norm_logits_i = logits_i / IMAGE_LOGITS_STD
 
-            # fuse (using FusionAV in both modes).
+            # fuse.
             if fusion_type == "avg":
                 fused_probs = fusion_head.fuse_probs(
                     probs_audio=probs_a,
@@ -114,8 +114,8 @@ with torch.no_grad():
                 fused_probs, alpha = fusion_head.fuse_probs(
                     probs_audio=probs_a,
                     probs_image=probs_i,
-                    pre_softmax_audio=norm_logits_a,      # normalized!
-                    pre_softmax_image=norm_logits_i,      # normalized!
+                    pre_softmax_audio=norm_logits_a,      # normalized
+                    pre_softmax_image=norm_logits_i,      # normalized
                     return_gate=True
                 )
                 alpha_a, alpha_i = alpha[:, 0], alpha[:, 1]

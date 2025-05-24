@@ -8,7 +8,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from src.fusion.AudioImageFusion import FusionAV
+from AudioImageFusion import AudioImageFusion
 from dataloader import FlexibleFusionDataset, ConflictValDataset
 
 seed = 42
@@ -22,7 +22,6 @@ torch.backends.cudnn.benchmark     = False
 batch_size = 32
 epochs = 150
 patience = 15
-gate_hidden = 32  # Kept for compatibility/logging, not used
 oversample_audio  = False
 frac_conflict = 0.3
 lam_kl = 0.0
@@ -48,15 +47,15 @@ for lam_prefer_image in lam_prefer_image_grid:
 
         # Datasets.
         train_ds = FlexibleFusionDataset(
-            logits_audio_dir="./logits/audio/train",
-            logits_image_dir="./logits/images/train",
+            logits_audio_dir="../../logits/audio/train",
+            logits_image_dir="../../logits/images/train",
             class_names=class_names,
             pair_mode=False,
             oversample_audio=oversample_audio
         )
         val_ds = ConflictValDataset(
-            logits_audio_dir="./logits/audio/val",
-            logits_image_dir="./logits/images/val",
+            logits_audio_dir="../../logits/audio/val",
+            logits_image_dir="../../logits/images/val",
             class_names=class_names,
             frac_conflict=frac_conflict
         )
@@ -64,7 +63,7 @@ for lam_prefer_image in lam_prefer_image_grid:
         val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
 
         # Model.
-        fusion_head = FusionAV(
+        fusion_head = AudioImageFusion(
             num_classes=num_classes,
             fusion_mode="gate"
         ).to(device)

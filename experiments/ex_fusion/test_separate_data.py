@@ -1,40 +1,53 @@
-# --------------------------------------------------------------------------------#
-# Unsynchronized audio/image fusion test (LOGITS-ONLY, supports "avg" and "gate") #
-# --------------------------------------------------------------------------------#
+# --------------------------------------------------------------------------------
+# Unsynchronized audio/image fusion test (LOGITS-ONLY, supports "avg" and "gate")
+# --------------------------------------------------------------------------------
+
 import sys, os, torch, torchaudio, numpy as np, pandas as pd
 from sklearn.metrics import classification_report, confusion_matrix
+from datetime import datetime
 
-# Add project root to sys.path for local imports
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 from audio import load_audio_model, audio_to_tensor, audio_predict
 from image_model_interface import load_image_model, extract_image_features
-from src.fusion.AudioImageFusion import FusionAV
+from AudioImageFusion import AudioImageFusion
+
+# --- Normalization constants (MUST match your training/grid search) ---
+AUDIO_LOGITS_STD = 5.11
+IMAGE_LOGITS_STD = 1.58
 
 # Config-
 class_names   = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
-audio_root    = "./dataset/audio/EmoDB_audio_test"
-image_root    = "./dataset/images/test"
 
-fusion_type = "gate"   # "avg" or "gate".
-alpha = 0.3   # Only used if fusion_type="avg".
-
-ckpt_path = "./models/best_gate_head_logits.pth"
-out_dir  = "./results"
-os.makedirs(out_dir, exist_ok=True)
-csv_path = f"{out_dir}/unsync_compare_{fusion_type}_logits.csv"
-device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+fusion_type = "avg"   # "avg" or "gate".
+alpha = 0.4   # Only used if fusion_type=="avg".
 
 # Load base models.
-audio_model, _ = load_audio_model(model_path="./models/mobilenetv2_aud.pth")
-image_model = load_image_model(model_path="./models/mobilenetv2_img.pth")
+audio_model, _ = load_audio_model(model_path="../../models/mobilenetv2_aud.pth")
+image_model = load_image_model(model_path="../../models/mobilenetv2_img.pth")
+
+ckpt_path = "../../models/best_gate_head_logits.pth"
+out_dir  = "../../results"
+os.makedirs(out_dir, exist_ok=True)
+
+exp_name = "test"
+audio_root = "../../dataset/audio/test"
+image_root = "../../dataset/images/test"
+
+if fusion_type == "gate":
+    csv_path = f"{out_dir}/fusion_{exp_name}_{fusion_type}.csv"
+else:
+    csv_path = f"{out_dir}/fusion_{exp_name}_{fusion_type}_alpha{alpha}.csv"
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 print("Audio & image backbones loaded.")
 
 # Load fusion model according to mode:
 if fusion_type == "avg":
-    fusion_head = FusionAV(
+    fusion_head = AudioImageFusion(
         num_classes=len(class_names),
         fusion_mode="avg",
         alpha=alpha
@@ -42,7 +55,7 @@ if fusion_type == "avg":
     print(f"FusionAV loaded for avg fusion (alpha={alpha}).")
 elif fusion_type == "gate":
     ckpt = torch.load(ckpt_path, map_location="cpu")
-    fusion_head = FusionAV(
+    fusion_head = AudioImageFusion(
         num_classes=len(class_names),
         fusion_mode="gate"
     ).to(device)
@@ -84,6 +97,10 @@ with torch.no_grad():
             logits_a = logits_a.to(device)
             probs_a  = probs_a.to(device)
 
+            # === Normalize logits for gate ===
+            norm_logits_a = logits_a / AUDIO_LOGITS_STD
+            norm_logits_i = logits_i / IMAGE_LOGITS_STD
+
             # fuse (using FusionAV in both modes).
             if fusion_type == "avg":
                 fused_probs = fusion_head.fuse_probs(
@@ -97,8 +114,8 @@ with torch.no_grad():
                 fused_probs, alpha = fusion_head.fuse_probs(
                     probs_audio=probs_a,
                     probs_image=probs_i,
-                    pre_softmax_audio=logits_a,
-                    pre_softmax_image=logits_i,
+                    pre_softmax_audio=norm_logits_a,      # normalized!
+                    pre_softmax_image=norm_logits_i,      # normalized!
                     return_gate=True
                 )
                 alpha_a, alpha_i = alpha[:, 0], alpha[:, 1]

@@ -4,9 +4,9 @@ from collections import deque
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path: sys.path.insert(0, ROOT)
 
-from experiments.ex_fusion.audio import load_audio_model, audio_to_tensor, audio_predict
-from experiments.ex_fusion.image_model_interface import load_image_model, extract_image_features
-from src.fusion.old_AV_Fusion import FusionAV
+from audio import load_audio_model, audio_to_tensor, audio_predict
+from image_model_interface import load_image_model, extract_image_features
+from AudioImageFusion import AudioImageFusion
 
 fusion_mode = "avg"
 alfa = 0.3
@@ -18,18 +18,18 @@ num_win = 10
 classes = ["Angry","Disgust","Fear","Happy","Neutral","Sad"]
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-aud_model, _ = load_audio_model("./models/mobilenetv2_aud.pth")
-image_model = load_image_model("./models/mobilenetv2_img.pth")
+aud_model, _ = load_audio_model("../../models/mobilenetv2_aud.pth")
+image_model = load_image_model("../../models/mobilenetv2_img.pth")
 
 if fusion_mode == "gate":
-    fusion_head = FusionAV(
+    fusion_head = AudioImageFusion(
         num_classes=len(classes), fusion_mode="gate"
     ).to(device)
-    fusion_head.load_state_dict(torch.load("./models/best_gate_head_logits.pth", map_location=device)["state_dict"])
+    fusion_head.load_state_dict(torch.load("../../models/best_gate_head_logits.pth", map_location=device)["state_dict"])
     fusion_head.eval()
     print("Gate fusion head loaded.")
 elif fusion_mode == "avg":
-    fusion_head = FusionAV(
+    fusion_head = AudioImageFusion(
         num_classes=len(classes), fusion_mode="avg", alpha=alfa
     ).to(device)
     print(f"Avg fusion head loaded (alpha={alfa}).")

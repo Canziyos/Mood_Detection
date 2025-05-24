@@ -1,0 +1,49 @@
+
+Fusion acc: 0.4758
+Audio-only acc: 0.3590
+Image-only acc: 0.4714
+
+--- Fusion ---
+              precision    recall  f1-score   support
+
+       Angry       0.56      0.69      0.61       127
+     Disgust       0.74      0.37      0.49        46
+        Fear       0.20      0.14      0.17        69
+       Happy       0.74      0.39      0.51        71
+     Neutral       0.61      0.58      0.60        79
+         Sad       0.25      0.45      0.32        62
+
+    accuracy                           0.48       454
+   macro avg       0.52      0.44      0.45       454
+weighted avg       0.52      0.48      0.48       454
+
+
+--- Audio-only ---
+              precision    recall  f1-score   support
+
+       Angry       0.41      0.89      0.56       127
+     Disgust       0.61      0.37      0.46        46
+        Fear       0.18      0.23      0.20        69
+       Happy       0.23      0.20      0.21        71
+     Neutral       1.00      0.04      0.07        79
+         Sad       0.00      0.00      0.00        62
+
+    accuracy                           0.36       454
+   macro avg       0.41      0.29      0.25       454
+weighted avg       0.42      0.36      0.28       454
+
+
+--- Image-only ---
+              precision    recall  f1-score   support
+
+       Angry       0.98      0.32      0.49       127
+     Disgust       0.65      0.28      0.39        46
+        Fear       0.79      0.16      0.27        69
+       Happy       0.89      0.44      0.58        71
+     Neutral       0.49      0.78      0.60        79
+         Sad       0.26      0.90      0.40        62
+
+    accuracy                           0.47       454
+   macro avg       0.67      0.48      0.46       454
+weighted avg       0.72      0.47      0.47       454
+

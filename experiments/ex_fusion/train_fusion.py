@@ -6,7 +6,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from src.fusion.AudioImageFusion import AudioImageFusion
+from AudioImageFusion import AudioImageFusion
 from dataloader import FlexibleFusionDataset, ConflictValDataset
 
 seed = 42
@@ -29,22 +29,22 @@ lr                = 1e-3
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 num_classes = len(class_names)
 
-results_dir = "./models"
+results_dir = "../../models"
 os.makedirs(results_dir, exist_ok=True)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Datasets
 train_ds = FlexibleFusionDataset(
-    logits_audio_dir="./logits/audio/train",
-    logits_image_dir="./logits/images/train",
+    logits_audio_dir="../../logits/audio/train",
+    logits_image_dir="../../logits/images/train",
     class_names=class_names,
     pair_mode=False,
     oversample_audio=oversample_audio
 )
 
 val_ds = ConflictValDataset(
-    logits_audio_dir="./logits/audio/val",
-    logits_image_dir="./logits/images/val",
+    logits_audio_dir="../../logits/audio/val",
+    logits_image_dir="../../logits/images/val",
     class_names=class_names,
     frac_conflict=frac_conflict
 )

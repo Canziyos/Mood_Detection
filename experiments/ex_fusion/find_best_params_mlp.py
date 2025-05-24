@@ -11,14 +11,14 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from src.fusion.old_AV_Fusion import FusionAV
+from AudioImageFusion import AudioImageFusion
 from dataloader import FlexibleFusionDataset, ConflictValDataset
 
 # --------------------------------------------------------------#
 
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 device      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-results_dir = "./models"; os.makedirs(results_dir, exist_ok=True)
+results_dir = "../../models"; os.makedirs(results_dir, exist_ok=True)
 
 # Extended grid: more lam_kl, add lam_entropy.
 search_space = {
@@ -31,8 +31,7 @@ search_space = {
     "frac_conflict" : [0.3, 0.5],
 }
 
-grid = list(dict(zip(search_space, v)) for v in \
-            itertools.product(*search_space.values()))
+grid = list(dict(zip(search_space, v)) for v in itertools.product(*search_space.values()))
 
 
 
@@ -65,7 +64,7 @@ def train_once(cfg):
     train_loader = make_loader("train", cfg=cfg)
     val_loader   = make_loader("val",   cfg=cfg)
 
-    fusion = FusionAV(
+    fusion = AudioImageFusion(
         num_classes = len(class_names),
         fusion_mode = "gate",
         latent_dim_audio = 1280 if cfg["use_latents"] else None,
@@ -74,9 +73,9 @@ def train_once(cfg):
         gate_hidden= cfg["gate_hidden"]
     ).to(device)
 
-    opt      = torch.optim.Adam(fusion.parameters(), lr=cfg["lr"])
-    ce_fn    = torch.nn.CrossEntropyLoss()
-    kl_fn    = torch.nn.KLDivLoss(reduction="batchmean")
+    opt = torch.optim.Adam(fusion.parameters(), lr=cfg["lr"])
+    ce_fn = torch.nn.CrossEntropyLoss()
+    kl_fn = torch.nn.KLDivLoss(reduction="batchmean")
 
     best_val, best_acc, bad, start = float("inf"), 0.0, 0, time.time()
     for ep in range(1, 101):

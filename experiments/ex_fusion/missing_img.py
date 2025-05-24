@@ -6,16 +6,16 @@ project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-from experiments.ex_fusion.audio import load_audio_model, audio_to_tensor, audio_predict
-from experiments.ex_fusion.image_model_interface import load_image_model
-from src.fusion.AudioImageFusion import FusionAV
+from audio import load_audio_model, audio_to_tensor, audio_predict
+from image_model_interface import load_image_model
+from AudioImageFusion import AudioImageFusion
 
 # Config.
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
 audio_root = "./EmoDB_For_AudioTest"
 image_down = True  # Simulate image missing/down.
 fusion_type = "gate"  # "gate" or "avg".
-alpha = 0.3  # Only used if fusion_type="avg".
+alpha = 0.3  # for fusion_type="avg".
 ckpt_path = "./models/best_gate_head_logits.pth"
 out_dir = "./results"
 os.makedirs(out_dir, exist_ok=True)
@@ -28,7 +28,7 @@ print("Audio backbone loaded.")
 
 # Load fusion model.
 if fusion_type == "avg":
-    fusion_head = FusionAV(
+    fusion_head = AudioImageFusion(
         num_classes=len(class_names),
         fusion_mode="avg",
         alpha=alpha
@@ -36,7 +36,7 @@ if fusion_type == "avg":
     print(f"FusionAV loaded for avg fusion (alpha={alpha}).")
 elif fusion_type == "gate":
     ckpt = torch.load(ckpt_path, map_location=device)
-    fusion_head = FusionAV(
+    fusion_head = AudioImageFusion(
         num_classes=len(class_names),
         fusion_mode="gate"
     ).to(device)

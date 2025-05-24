@@ -7,24 +7,24 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from src.fusion.AudioImageFusion import FusionAV
+from AudioImageFusion import AudioImageFusion
 from dataloader import FlexibleFusionDataset
 
-ckpt_path = "./models/best_gate_head_logits.pth"
+ckpt_path = "../../models/best_gate_head_logits.pth"
 class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
-batch_size  = 64
+batch_size  = 32
 device      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 test_ds = FlexibleFusionDataset(
-    logits_audio_dir="./logits/audio/test",
-    logits_image_dir="./logits/images/test",
+    logits_audio_dir="../../logits/audio/test",
+    logits_image_dir="../../logits/images/test",
     class_names=class_names,
     pair_mode=True
 )
 test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False)
 
 ckpt = torch.load(ckpt_path, map_location="cpu")
-fusion_head = FusionAV(
+fusion_head = AudioImageFusion(
     num_classes=len(class_names),
     fusion_mode="gate"
 ).to(device)

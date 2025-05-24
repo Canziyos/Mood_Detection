@@ -14,9 +14,11 @@ from audio import load_audio_model, audio_to_tensor, audio_predict
 from image_model_interface import load_image_model, extract_image_features
 from AudioImageFusion import AudioImageFusion
 
-# Normalization constants (Must match training/grid search)
-AUDIO_LOGITS_STD = 5.11
-IMAGE_LOGITS_STD = 1.58
+# Logit normalization values (mean & std) for both modalities (from stats.py)
+aud_logits_mean = -2.953
+aud_logits_std  = 5.11
+img_logits_mean = -0.592
+img_logits_std  = 1.58
 
 # Config-
 class_names   = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
@@ -99,7 +101,7 @@ with torch.no_grad():
 
             # Normalize logits for gate.
             norm_logits_a = logits_a / AUDIO_LOGITS_STD
-            norm_logits_i = logits_i / IMAGE_LOGITS_STD
+            norm_logits_i = logits_i / img_logits_std
 
             # fuse.
             if fusion_type == "avg":

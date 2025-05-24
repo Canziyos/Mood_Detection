@@ -1,7 +1,6 @@
 import os, sys, torch, numpy as np, random
 from torch.utils.data import DataLoader
 
-# Repo path hack.
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
@@ -16,7 +15,13 @@ random.seed(seed)
 torch.backends.cudnn.deterministic = True
 torch.backends.cudnn.benchmark     = False
 
-# Params
+# Logit normalization values.
+aud_logits_mean = -2.953
+aud_logits_std  = 5.11
+img_logits_mean = -0.592
+img_logits_std  = 1.58
+
+# Params.
 batch_size        = 32
 epochs            = 150
 patience          = 15
@@ -52,31 +57,34 @@ val_ds = ConflictValDataset(
 train_loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True)
 val_loader   = DataLoader(val_ds,   batch_size=batch_size, shuffle=False)
 
-# MODEL.
 fusion_head = AudioImageFusion(
     num_classes=num_classes,
     fusion_mode="gate",
 ).to(device)
 
-# OPTIM / LOSSES.
 optimizer  = torch.optim.Adam(fusion_head.parameters(), lr=lr)
 scheduler  = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
 ce_criterion = torch.nn.CrossEntropyLoss()
 
 best_val, bad_epochs, best_state = float("inf"), 0, None
-ckpt = f"{results_dir}/best_gate_head_logits.pth"
+ckpt = f"{results_dir}/best_gate_normalized_logits.pth"
+
 for ep in range(1, epochs + 1):
     fusion_head.train()
     running = 0.0
 
-    for logits_a, logits_i, _, _, y in train_loader:
+    for logits_a, logits_i, _, _, y in train_loaer:
         logits_a, logits_i, y = logits_a.to(device), logits_i.to(device), y.to(device)
+
+        # Normalize logits before fusion gate
+        norm_logits_a = (logits_a - aud_logits_mean) / aud_logits_std
+        norm_logits_i = (logits_i - img_logits_mean) / img_logits_std
 
         optimizer.zero_grad()
         logits_f, alpha = fusion_head.fuse_probs(
             probs_audio=torch.softmax(logits_a, dim=1),
             probs_image=torch.softmax(logits_i, dim=1),
-            pre_softmax_audio=logits_a, pre_softmax_image=logits_i,
+            pre_softmax_audio=norm_logits_a, pre_softmax_image=norm_logits_i,
             return_gate=True
         )
         ce = ce_criterion(logits_f, y)
@@ -91,16 +99,20 @@ for ep in range(1, epochs + 1):
     train_loss = running / len(train_loader.dataset)
     scheduler.step()
 
-    # Validate.
+    # Validation.
     fusion_head.eval()
     val_loss, correct, total, alpha_a_vals, alpha_i_vals = 0.0, 0, 0, [], []
     with torch.no_grad():
         for logits_a, logits_i, _, _, y in val_loader:
             logits_a, logits_i, y = logits_a.to(device), logits_i.to(device), y.to(device)
+            # Normalize logits before fusion gate
+            norm_logits_a = (logits_a - aud_logits_mean) / aud_logits_std
+            norm_logits_i = (logits_i - img_logits_mean) / img_logits_std
+
             logits_f, alpha = fusion_head.fuse_probs(
                 probs_audio=torch.softmax(logits_a, dim=1),
                 probs_image=torch.softmax(logits_i, dim=1),
-                pre_softmax_audio=logits_a, pre_softmax_image=logits_i,
+                pre_softmax_audio=norm_logits_a, pre_softmax_image=norm_logits_i,
                 return_gate=True
             )
             val_loss += ce_criterion(logits_f, y).item() * y.size(0)
@@ -129,7 +141,6 @@ for ep in range(1, epochs + 1):
             print("Early stopping.")
             break
 
-# Load best.
 if best_state:
     fusion_head.load_state_dict(best_state)
     print(f"Best model re-loaded (val loss {best_val:.4f}, acc {val_acc:.4f}).")

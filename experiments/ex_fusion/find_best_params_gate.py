@@ -11,7 +11,7 @@ from utils import load_config
 
 
 # ---------------------------------------------------------------------
-# Load YAML config for all static params
+# Load YAML config for all static params.
 config = load_config("config.yaml")
 
 # Normalization values

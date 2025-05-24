@@ -203,3 +203,6 @@ results/*
 # not these:
 !results/*.png
 !results/*.txt
+
+models/*
+!models/gate_normalized_logits.pth

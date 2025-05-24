@@ -1,53 +1,58 @@
-# --------------------------------------------------------------------------------
-# Unsynchronized audio/image fusion test (LOGITS-ONLY, supports "avg" and "gate")
-# --------------------------------------------------------------------------------
 
-import sys, os, torch, torchaudio, numpy as np, pandas as pd
+import sys
+import os
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+
+import torch, torchaudio, numpy as np, pandas as pd
 from sklearn.metrics import classification_report
-from datetime import datetime
-
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-
+from utils import load_config
 from audio import load_audio_model, audio_to_tensor, audio_predict
 from image_model_interface import load_image_model, extract_image_features
 from AudioImageFusion import AudioImageFusion
 
-# Logit normalization values (mean & std) for both modalities (from stats.py)
-aud_logits_mean = -2.953
-aud_logits_std  = 5.11
-img_logits_mean = -0.592
-img_logits_std  = 1.58
+config = load_config("config.yaml")
 
-# Config-
-class_names   = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
+# Normalization values (from config).
+aud_logits_mean = config["normalization"]["aud_logits_mean"]
+aud_logits_std  = config["normalization"]["aud_logits_std"]
+img_logits_mean = config["normalization"]["img_logits_mean"]
+img_logits_std  = config["normalization"]["img_logits_std"]
+
+class_names = config["classes"]
+
+# Paths from config.
+# audio_model_path = config["checkpoints"]["audio_model"]
+# image_model_path = config["checkpoints"]["image_model"]
+audio_model_path = config["models"]["audio_model"]
+image_model_path = config["models"]["image_model"]
+ckpt_path        = config["models"]["gate"]
+out_dir          = config["out_dir"]
+
+# Choose test set from config (example: audio and image test directories).
+audio_root = config["data"]["emo_db_test"]
+image_root = config["data"]["raf_db_test"]
+# exp_name = "test"
+exp_name = "corpos"
 
 fusion_type = "avg"   # "avg" or "gate".
-alpha = 0.4   # Only used if fusion_type=="avg".
+alpha = 0.3   # used if fusion_type=="avg".
 
-# Load base models.
-audio_model, _ = load_audio_model(model_path="../../models/mobilenetv2_aud.pth")
-image_model = load_image_model(model_path="../../models/mobilenetv2_img.pth")
-
-ckpt_path = "../../models/best_gate_head_logits.pth"
-out_dir  = "../../results"
 os.makedirs(out_dir, exist_ok=True)
-
-exp_name = "test"
-audio_root = "../../dataset/audio/test"
-image_root = "../../dataset/images/test"
-
 if fusion_type == "gate":
     csv_path = f"{out_dir}/fusion_{exp_name}_{fusion_type}.csv"
 else:
     csv_path = f"{out_dir}/fusion_{exp_name}_{fusion_type}_alpha{alpha}.csv"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Audio and image backbones loaded.")
 
-print("Audio & image backbones loaded.")
+audio_model, _ = load_audio_model(model_path=audio_model_path)
+image_model = load_image_model(model_path=image_model_path)
 
-# Load fusion model according to mode:
+# Load fusion model according to mode.
 if fusion_type == "avg":
     fusion_head = AudioImageFusion(
         num_classes=len(class_names),
@@ -67,7 +72,9 @@ elif fusion_type == "gate":
 else:
     raise ValueError(f"Unknown fusion_type: {fusion_type}")
 
-# Inference loop.
+def normalize_logits(logits, mean, std):
+    return (logits - mean) / std
+
 records, y_true, y_a, y_i, y_f = [], [], [], [], []
 alpha_a_list, alpha_i_list = [], []
 
@@ -87,23 +94,23 @@ with torch.no_grad():
             continue
 
         for idx in range(N):
-            # audio forward.
+            # Audio forward.
             wav, sr = torchaudio.load(os.path.join(a_dir, a_files[idx]))
             aud_t = audio_to_tensor(wav, sr)
             logits_a, probs_a, _, pred_a = audio_predict(audio_model, aud_t, device)
-
-            # image forward.
-            lab_i, probs_i, logits_i, _ = extract_image_features(os.path.join(i_dir, i_files[idx]))
-            logits_i = torch.tensor(logits_i, dtype=torch.float32).to(device)
-            probs_i  = torch.tensor(probs_i,  dtype=torch.float32).to(device)
             logits_a = logits_a.to(device)
             probs_a  = probs_a.to(device)
 
-            # Normalize logits for gate.
-            norm_logits_a = logits_a / AUDIO_LOGITS_STD
-            norm_logits_i = logits_i / img_logits_std
+            # Image forward.
+            lab_i, probs_i, logits_i, _ = extract_image_features(os.path.join(i_dir, i_files[idx]))
+            logits_i = torch.tensor(logits_i, dtype=torch.float32).to(device)
+            probs_i  = torch.tensor(probs_i,  dtype=torch.float32).to(device)
 
-            # fuse.
+            # Normalize logits for gate.
+            norm_logits_a = normalize_logits(logits_a, aud_logits_mean, aud_logits_std)
+            norm_logits_i = normalize_logits(logits_i, img_logits_mean, img_logits_std)
+
+            # Fuse.
             if fusion_type == "avg":
                 fused_probs = fusion_head.fuse_probs(
                     probs_audio=probs_a,
@@ -116,8 +123,8 @@ with torch.no_grad():
                 fused_probs, alpha = fusion_head.fuse_probs(
                     probs_audio=probs_a,
                     probs_image=probs_i,
-                    pre_softmax_audio=norm_logits_a,      # normalized
-                    pre_softmax_image=norm_logits_i,      # normalized
+                    pre_softmax_audio=norm_logits_a,
+                    pre_softmax_image=norm_logits_i,
                     return_gate=True
                 )
                 alpha_a, alpha_i = alpha[:, 0], alpha[:, 1]
@@ -148,7 +155,6 @@ with torch.no_grad():
 
         print(f"[{cname}] paired {N} samples (audio {len(a_files)}/ image {len(i_files)})")
 
-# Metrics.
 print("\n=== AUDIO vs IMAGE vs FUSION ===")
 for name, y_hat in [("Audio", y_a), ("Image", y_i), ("Fusion", y_f)]:
     print(f"\n{name} report:")
@@ -156,8 +162,7 @@ for name, y_hat in [("Audio", y_a), ("Image", y_i), ("Fusion", y_f)]:
 
 mean_a = np.mean(alpha_a_list) if alpha_a_list else 0
 mean_i = np.mean(alpha_i_list) if alpha_i_list else 0
-print(f"\nalfa audio (mean): {mean_a:.3f}   |   alfa image (mean): {mean_i:.3f}")
+print(f"\nalpha audio (mean): {mean_a:.3f}   |   alpha image (mean): {mean_i:.3f}")
 
-# Save csv.
 pd.DataFrame(records).to_csv(csv_path, index=False)
 print(f"\nResults written to {csv_path}")

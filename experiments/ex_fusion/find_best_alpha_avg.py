@@ -1,39 +1,49 @@
-# ------------------------------------------------------------
-# test_avg_grid.py — grid search static alpha for avg fusion (LOGITS-ONLY)
-# ------------------------------------------------------------
-import sys, os, torch, torchaudio, numpy as np, pandas as pd
+import sys
+import os
+import yaml
+import torch
+import torchaudio
+import numpy as np
+import pandas as pd
 from sklearn.metrics import classification_report, accuracy_score
+from utils import load_config
 
-project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
 
 from audio import load_audio_model, audio_to_tensor, audio_predict
 from image_model_interface import load_image_model, extract_image_features
 from AudioImageFusion import AudioImageFusion
 
-class_names   = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
-audio_root    = "./dataset/audio/train"
-image_root    = "./dataset/images/train"
+# config and paths.
+config = load_config("config.yaml")
 
-alphas_to_try = np.linspace(0.0, 1.0, 11)   # 0.0, 0.1, ..., 1.0.
-
-out_dir  = "./results"
+# validation set for hyperparameter search.
+audio_root = config["data"]["aud_val_dir"]
+image_root = config["data"]["img_val_dir"]
+out_dir = config.get("out_dir", "results/")
 os.makedirs(out_dir, exist_ok=True)
-device   = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-# Load models.
-audio_model, _ = load_audio_model(model_path="../../models/mobilenetv2_aud.pth")
-image_model = load_image_model(model_path="../../models/mobilenetv2_img.pth")
-print("Audio & image backbones loaded.")
+class_names = config["classes"]
+audio_model_path = config["models"]["audio_model"]
+image_model_path = config["models"]["image_model"]
+
+alphas_to_try = np.linspace(0.0, 1.0, 21)  # we can try finer steps.
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# models loading.
+audio_model, _ = load_audio_model(model_path=audio_model_path)
+image_model = load_image_model(model_path=image_model_path)
+print("Audio and image backbones loaded.")
 
 best_acc = -1
 best_alpha = None
 all_results = []
 
 for alpha in alphas_to_try:
-    print("\n" + "="*48)
-    print(f"=== Testing alpha = {alpha:.2f} (audio weight, image={1-alpha:.2f}) ===")
+    print(f"\n=== Testing alpha = {alpha:.2f} (audio weight, image={1-alpha:.2f}) ===")
     fusion_head = AudioImageFusion(
         num_classes=len(class_names),
         fusion_mode="avg",
@@ -57,21 +67,18 @@ for alpha in alphas_to_try:
                 print(f"Skipping class '{cname}' (no paired files).")
                 continue
 
-            # Print how many test pairs per class.
             print(f"[{cname}] paired {N} samples (audio {len(a_files)}/ image {len(i_files)})")
 
             for idx in range(N):
-                # Audio forward.
                 wav, sr = torchaudio.load(os.path.join(a_dir, a_files[idx]))
                 aud_t = audio_to_tensor(wav, sr)
                 logits_a, probs_a, _, pred_a = audio_predict(audio_model, aud_t, device)
 
-                # Image forward.
                 lab_i, probs_i, logits_i, _ = extract_image_features(os.path.join(i_dir, i_files[idx]))
                 logits_i = torch.tensor(logits_i, dtype=torch.float32).to(device)
-                probs_i  = torch.tensor(probs_i,  dtype=torch.float32).to(device)
+                probs_i = torch.tensor(probs_i, dtype=torch.float32).to(device)
                 logits_a = logits_a.to(device)
-                probs_a  = probs_a.to(device)
+                probs_a = probs_a.to(device)
 
                 fused_probs = fusion_head.fuse_probs(
                     probs_audio=probs_a,
@@ -80,11 +87,6 @@ for alpha in alphas_to_try:
                     pre_softmax_image=logits_i
                 )
                 pred_f = class_names[torch.argmax(fused_probs).item()]
-                if pred_f != pred_a or pred_f != lab_i:
-                    print(f"Changed: class={cname} idx={idx} audio_pred={pred_a} image_pred={lab_i} fusion_pred={pred_f} fusion_probs={fused_probs.cpu().numpy().round(3)}")
-                # Print a few random samples for this alpha.
-                if idx < 2:  # Print only for first two per class.
-                    print(f" [{cname} | idx={idx}] audio_pred={pred_a}  image_pred={lab_i}  fusion_pred={pred_f}  fusion_probs={fused_probs.cpu().numpy().round(3)}")
 
                 y_true.append(class_names.index(cname))
                 y_a.append(class_names.index(pred_a))
@@ -109,7 +111,6 @@ for alpha in alphas_to_try:
     print(classification_report(y_true, y_f, target_names=class_names, digits=3))
     print(f"Fusion accuracy: {acc:.4f}")
 
-    # Save per-alpha CSV:
     per_alpha_csv = os.path.join(out_dir, f"unsync_compare_avg_logits_alpha_{alpha:.2f}.csv")
     pd.DataFrame(records).to_csv(per_alpha_csv, index=False)
     print(f"Saved: {per_alpha_csv}")
@@ -118,10 +119,8 @@ for alpha in alphas_to_try:
         best_acc = acc
         best_alpha = alpha
 
-# Save summary CSV:
 df_summary = pd.DataFrame(all_results)
-df_summary.to_csv(os.path.join(out_dir, "avg_alpha_grid_search_summary.csv"), index=False)
+df_summary.to_csv(os.path.join(out_dir, "avg_alpha_gs_summary.csv"), index=False)
 print("\n==== GRID SEARCH SUMMARY ====")
 print(df_summary)
-
 print(f"\nBest alpha: {best_alpha:.2f} | Best fusion accuracy: {best_acc:.4f}")

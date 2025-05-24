@@ -1,7 +1,3 @@
-"""
-Grid-search trainer for the AudioImageFusion head (logits-only version, with mean-std normalization).
-Any combination that crashes is skipped.
-"""
 import os, sys, time, json, itertools, torch, pandas as pd
 from torch.utils.data import DataLoader
 
@@ -11,28 +7,41 @@ if ROOT not in sys.path:
 
 from AudioImageFusion import AudioImageFusion
 from dataloader import FlexibleFusionDataset, ConflictValDataset
+from utils import load_config
 
-print("\nGate...\n")
 
 # ---------------------------------------------------------------------
-# Logit normalization values (mean & std) for both modalities (from stats.py)
-aud_logits_mean = -2.953
-aud_logits_std  = 5.11
-img_logits_mean = -0.592
-img_logits_std  = 1.58
+# Load YAML config for all static params
+config = load_config("config.yaml")
 
-class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
+# Normalization values
+norm_cfg = config["normalization"]
+aud_logits_mean = norm_cfg["aud_logits_mean"]
+aud_logits_std  = norm_cfg["aud_logits_std"]
+img_logits_mean = norm_cfg["img_logits_mean"]
+img_logits_std  = norm_cfg["img_logits_std"]
+
+# Paths from config (do not grid search these)
+logits_train_audio = config["logits"]["train_aud_logits_dir"]
+logits_train_image = config["logits"]["train_img_logits_dir"]
+logits_val_audio   = config["logits"]["val_aud_logits_dir"]
+logits_val_image   = config["logits"]["val_img_logits_dir"]
+
+class_names = config["classes"]
+
 device      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-results_dir = "./models"
+
+results_dir = config["results_dir"]["root"]
 os.makedirs(results_dir, exist_ok=True)
 
-# Grid search params.
+# Grid search params (NOT from YAML).
 search_space = {
-    "oversample_audio": [False, True],
-    "lam_kl": [0.0, 0.02, 0.1],
-    "lr": [1e-4, 3e-4, 1e-3, 3e-3],
-    "frac_conflict": [0.0, 0.3, 0.5, 0.7],
-    "batch_size": [16, 32, 64],
+    "batch_size": [32, 64],
+    "oversample_audio": [False],
+    "frac_conflict": [0.0, 0.3],
+    "lam_kl": [0.0, 0.02, 0.05],
+    "lam_entropy": [0.0, 0.01, 0.05],
+    "lr": [0.0001, 0.0003, 0.001],
 }
 
 grid = list(dict(zip(search_space, v)) for v in itertools.product(*search_space.values()))
@@ -41,21 +50,21 @@ def make_loader(split, *, cfg):
     batch_size = cfg.get("batch_size", 32)
     if split == "val":
         ds = ConflictValDataset(
-            logits_audio_dir = f"../../logits/audio/{split}",
-            logits_image_dir = f"../../logits/images/{split}",
+            logits_audio_dir = logits_val_audio,
+            logits_image_dir = logits_val_image,
             class_names = class_names,
             frac_conflict = cfg["frac_conflict"],
         )
         shuffle = False
     else:
         ds = FlexibleFusionDataset(
-            logits_audio_dir = f"../../logits/audio/{split}",
-            logits_image_dir = f"../../logits/images/{split}",
+            logits_audio_dir = logits_train_audio,
+            logits_image_dir = logits_train_image,
             class_names = class_names,
-            pair_mode = (split != "train"),     # False = random, True = 1-to-1.
-            oversample_audio = (split == "train") and cfg["oversample_audio"],
+            pair_mode = False,
+            oversample_audio = cfg["oversample_audio"],
         )
-        shuffle = (split == "train")
+        shuffle = True
     return DataLoader(ds, batch_size=batch_size, shuffle=shuffle)
 
 def train_once(cfg):
@@ -79,7 +88,6 @@ def train_once(cfg):
 
         for logits_a, logits_i, _, _, y in train_loader:
             logits_a, logits_i, y = logits_a.to(device), logits_i.to(device), y.to(device)
-            # Mean-std normalize logits before gate.
             norm_logits_a = (logits_a - aud_logits_mean) / aud_logits_std
             norm_logits_i = (logits_i - img_logits_mean) / img_logits_std
             opt.zero_grad()
@@ -88,7 +96,6 @@ def train_once(cfg):
                 norm_logits_a, norm_logits_i, return_gate=True
             )
             logits_f = fused
-
             alpha_a, alpha_i = alpha_out[:, 0], alpha_out[:, 1]
             all_alpha_a.append(alpha_a.detach().cpu())
             all_alpha_i.append(alpha_i.detach().cpu())
@@ -97,9 +104,9 @@ def train_once(cfg):
             pa, pi = torch.softmax(logits_a, 1), torch.softmax(logits_i, 1)
             kl = kl_fn(torch.log(pa + 1e-9), pi.detach()) + \
                  kl_fn(torch.log(pi + 1e-9), pa.detach())
+            gate_entropy = -(alpha_out * (torch.log(alpha_out + 1e-8))).sum(dim=1).mean()
 
-            
-            loss = ce + cfg["lam_kl"] * kl
+            loss = ce + cfg["lam_kl"] * kl + cfg["lam_entropy"] * gate_entropy
 
             loss.backward()
             opt.step()
@@ -115,7 +122,6 @@ def train_once(cfg):
         with torch.no_grad():
             for logits_a, logits_i, _, _, y in val_loader:
                 logits_a, logits_i, y = logits_a.to(device), logits_i.to(device), y.to(device)
-                # Mean-std normalize logits before gate.
                 norm_logits_a = (logits_a - aud_logits_mean) / aud_logits_std
                 norm_logits_i = (logits_i - img_logits_mean) / img_logits_std
                 fused, alpha_out = fusion.fuse_probs(
@@ -152,20 +158,15 @@ for cfg in grid:
     except Exception as e:
         print(f"Crash: {e}")
 
-# Results.
+
 print("\n=== grid summary ===")
 summary.sort(key=lambda d: d["val_loss"])
 for s in summary:
     print(json.dumps(s, indent=None))
 
-# Save as JSON.
-with open("_grid_fusion_summary.json", "w") as f:
+with open("finetune2_fusion_summary.json", "w") as f:
     json.dump(summary, f, indent=2)
 
-# Save as CSV.
-pd.DataFrame(summary).to_csv("grid_fusion_summary.csv", index=False)
-
-# Print best config.
 if summary:
     print("\nBest config by val_loss:")
     print(json.dumps(summary[0], indent=2))

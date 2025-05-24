@@ -1,0 +1,49 @@
+logits:
+  train_aud_logits_dir: "logits/audio/train"
+  train_img_logits_dir: "logits/images/train"
+  val_aud_logits_dir: "logits/audio/val"
+  val_img_logits_dir: "logits/images/val"
+
+data:
+  aud_train_dir: "dataset/audio/train"
+  img_train_dir: "dataset/images/train"
+  aud_test_dir: "dataset/audio/test"
+  img_test_dir: "dataset/images/test"
+  aud_val_dir: "dataset/audio/val"
+  img_val_dir: "dataset/images/val"
+
+  emo_db_test: "dataset/audio/emo_db_test"
+  raf_db_test: "dataset/images/raf_db_test"
+
+models:
+  root: "models/"
+  audio_model: "models/mobilenetv2_aud.pth"
+  image_model: "models/mobilenetv2_img.pth"
+  gate: "models/best_gate_head_logits.pth"
+
+results_dir:
+  root: "results/"
+
+training:
+  batch_size: 64
+  epochs: 150
+  patience: 15
+  lr: 0.0003
+  oversample_audio: false
+  frac_conflict: 0.0
+  lam_kl: 0.02
+
+
+classes:
+  - Angry
+  - Disgust
+  - Fear
+  - Happy
+  - Neutral
+  - Sad
+
+normalization:
+  aud_logits_mean: -2.953
+  aud_logits_std: 5.11
+  img_logits_mean: -0.592
+  img_logits_std: 1.58

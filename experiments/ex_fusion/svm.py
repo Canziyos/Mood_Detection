@@ -6,26 +6,28 @@ if ROOT not in sys.path:
 
 import numpy as np
 from sklearn.model_selection import train_test_split
-from utils import compute_mean_std
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report, confusion_matrix
+import joblib
 
-# Define directory paths.
-logits_dir = {
-    "train_audio": "../../logits/audio/train",
-    "val_audio":   "../../logits/audio/val",
-    "train_image": "../../logits/images/train",
-    "val_image":   "../../logits/images/val"
-}
-results_dir = "../../models"
+from utils import compute_mean_std, load_config
 
-# Define class names.
-class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
+# Load config.
+config = load_config("config.yaml")
+
+# Directory paths from config.
+aud_logits_train_dir = config["logits"]["train_aud_logits_dir"]
+img_logits_train_dir = config["logits"]["train_img_logits_dir"]
+results_dir = config["models"]["root"]
+
+# Class names from config.
+class_names = config["classes"]
 n_classes = len(class_names)
 
 # Compute normalization statistics for training audio and image logits.
-aud_logits_mean, aud_logits_std = compute_mean_std(logits_dir["train_audio"])
-img_logits_mean, img_logits_std = compute_mean_std(logits_dir["train_image"])
+aud_logits_mean, aud_logits_std = compute_mean_std(aud_logits_train_dir)
+img_logits_mean, img_logits_std = compute_mean_std(img_logits_train_dir)
 
-# Define a function to load and normalize logits for a given directory.
 def load_and_normalize_logits(logits_dir, mean, std):
     all_logits = []
     all_labels = []
@@ -39,9 +41,9 @@ def load_and_normalize_logits(logits_dir, mean, std):
     all_labels = np.concatenate(all_labels)
     return all_logits, all_labels
 
-# Load and normalize training audio and image logits.
-audio_logits, y = load_and_normalize_logits(logits_dir["train_audio"], aud_logits_mean, aud_logits_std)
-image_logits, _ = load_and_normalize_logits(logits_dir["train_image"], img_logits_mean, img_logits_std)
+# Load and normalize.
+audio_logits, y = load_and_normalize_logits(aud_logits_train_dir, aud_logits_mean, aud_logits_std)
+image_logits, _ = load_and_normalize_logits(img_logits_train_dir, img_logits_mean, img_logits_std)
 
 # Concatenate audio and image logits to create the feature matrix.
 X = np.concatenate([audio_logits, image_logits], axis=1)
@@ -50,9 +52,6 @@ print("Labels shape:", y.shape)
 
 # Split the data into training and validation sets.
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1, stratify=y, random_state=42)
-
-from sklearn.svm import SVC
-from sklearn.metrics import classification_report, confusion_matrix
 
 # Train a linear SVM as a late fusion classifier.
 svm = SVC(kernel="linear", probability=True, random_state=42)
@@ -66,5 +65,4 @@ print("Classification Report:")
 print(classification_report(y_val, y_pred, target_names=class_names))
 
 # Save the trained SVM model.
-import joblib
 joblib.dump(svm, os.path.join(results_dir, "late_fusion_svm.pkl"))

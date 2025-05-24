@@ -14,14 +14,14 @@ from utils import load_config
 # Load YAML config for all static params.
 config = load_config("config.yaml")
 
-# Normalization values
+# Normalization values.
 norm_cfg = config["normalization"]
 aud_logits_mean = norm_cfg["aud_logits_mean"]
 aud_logits_std  = norm_cfg["aud_logits_std"]
 img_logits_mean = norm_cfg["img_logits_mean"]
 img_logits_std  = norm_cfg["img_logits_std"]
 
-# Paths from config (do not grid search these)
+# Paths from config.
 logits_train_audio = config["logits"]["train_aud_logits_dir"]
 logits_train_image = config["logits"]["train_img_logits_dir"]
 logits_val_audio   = config["logits"]["val_aud_logits_dir"]
@@ -29,7 +29,7 @@ logits_val_image   = config["logits"]["val_img_logits_dir"]
 
 class_names = config["classes"]
 
-device      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 results_dir = config["results_dir"]["root"]
 os.makedirs(results_dir, exist_ok=True)

@@ -10,3 +10,5 @@ imageio
 imageio-ffmpeg
 moviepy
 matplotlib
+pyyaml
+joblib

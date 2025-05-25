@@ -16,22 +16,46 @@ data:
   raf_db_test: "dataset/images/raf_db_test"
 
 models:
-  root: "models/"
+  root: "models"
   audio_model: "models/mobilenetv2_aud.pth"
   image_model: "models/mobilenetv2_img.pth"
-  gate: "models/best_gate_head_logits.pth"
+  gate: "models/gate_normalized_logits.pth"
+  aud_trained_on_crema: "models/mobilenetv2_aud_TrainedOnCREMA_64.84"
+  img_trained_on_crema: "models/mobilenetv2_img_TrainedOnCREMA_76.41"
 
 results_dir:
-  root: "results/"
+  root: "results"
 
 training:
-  batch_size: 64
+  batch_size: 32
   epochs: 150
   patience: 15
-  lr: 0.0003
+  lr: 0.0001
   oversample_audio: false
   frac_conflict: 0.0
-  lam_kl: 0.02
+  lam_kl: 0.01
+
+#training:
+#   batch_size: 32
+#   epochs: 150  
+#   patience: 15
+#   lr: 0.0003
+#   oversample_audio: false
+#   frac_conflict: 0.0
+#   lam_kl: 0.0
+#   lam_entropy: 0.05
+
+# training:
+#   batch_size: 64
+#   epochs: 150
+#   patience: 15
+#   lr: 0.0001
+#   oversample_audio: false
+#   frac_conflict: 0.0
+#   lam_kl: 0.0
+#   lam_entropy: 0.05
+#   seed: 42
+
 
 
 classes:

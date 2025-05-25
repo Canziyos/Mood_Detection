@@ -26,7 +26,8 @@ patience          = training_cfg["patience"]
 lr                = training_cfg["lr"]
 oversample_audio  = training_cfg["oversample_audio"]
 frac_conflict     = training_cfg["frac_conflict"]
-lam_kl            = training_cfg.get("lam_kl", 0.0) 
+lam_kl            = training_cfg.get("lam_kl", 0.0)
+lam_entropy       = training_cfg.get("lam_entropy", 0.0)
 
 class_names = config["classes"]
 num_classes = len(class_names)
@@ -79,11 +80,14 @@ best_val, bad_epochs, best_state = float("inf"), 0, None
 ckpt = os.path.join(results_dir, "gate_normalized_logits.pth")
 
 def normalize_logits(logits, mean, std):
+    mean = torch.tensor(mean, device=logits.device)
+    std = torch.tensor(std, device=logits.device)
     return (logits - mean) / std
 
 for ep in range(1, epochs + 1):
     fusion_head.train()
     running = 0.0
+    train_entropy_sum, train_entropy_count = 0.0, 0
 
     for logits_a, logits_i, _, _, y in train_loader:
         logits_a, logits_i, y = logits_a.to(device), logits_i.to(device), y.to(device)
@@ -91,38 +95,47 @@ for ep in range(1, epochs + 1):
         norm_logits_i = normalize_logits(logits_i, img_logits_mean, img_logits_std)
 
         optimizer.zero_grad()
-        logits_f, alpha = fusion_head.fuse_probs(
-            probs_audio=torch.softmax(logits_a, dim=1),
-            probs_image=torch.softmax(logits_i, dim=1),
-            pre_softmax_audio=norm_logits_a, pre_softmax_image=norm_logits_i,
-            return_gate=True
-        )
         probs_audio = torch.softmax(logits_a, dim=1)
         probs_image = torch.softmax(logits_i, dim=1)
+        logits_f, alpha = fusion_head.fuse_probs(
+            probs_audio=probs_audio,
+            probs_image=probs_image,
+            pre_softmax_audio=norm_logits_a,
+            pre_softmax_image=norm_logits_i,
+            return_gate=True
+        )
         ce = ce_criterion(logits_f, y)
         kl_loss = kl_criterion(torch.log(probs_audio + 1e-9), probs_image.detach()) + \
                   kl_criterion(torch.log(probs_image + 1e-9), probs_audio.detach())
-        loss = ce + lam_kl * kl_loss
+        gate_entropy = -(alpha * (torch.log(alpha + 1e-8))).sum(dim=1).mean()
+        loss = ce + lam_kl * kl_loss + lam_entropy * gate_entropy
 
         loss.backward()
         optimizer.step()
         running += loss.item() * y.size(0)
+        train_entropy_sum += gate_entropy.item() * y.size(0)
+        train_entropy_count += y.size(0)
 
     train_loss = running / len(train_loader.dataset)
+    train_entropy = train_entropy_sum / train_entropy_count
     scheduler.step()
 
     fusion_head.eval()
     val_loss, correct, total, alpha_a_vals, alpha_i_vals = 0.0, 0, 0, [], []
+    val_entropy_sum, val_entropy_count = 0.0, 0
     with torch.no_grad():
         for logits_a, logits_i, _, _, y in val_loader:
             logits_a, logits_i, y = logits_a.to(device), logits_i.to(device), y.to(device)
             norm_logits_a = normalize_logits(logits_a, aud_logits_mean, aud_logits_std)
             norm_logits_i = normalize_logits(logits_i, img_logits_mean, img_logits_std)
 
+            probs_audio = torch.softmax(logits_a, dim=1)
+            probs_image = torch.softmax(logits_i, dim=1)
             logits_f, alpha = fusion_head.fuse_probs(
-                probs_audio=torch.softmax(logits_a, dim=1),
-                probs_image=torch.softmax(logits_i, dim=1),
-                pre_softmax_audio=norm_logits_a, pre_softmax_image=norm_logits_i,
+                probs_audio=probs_audio,
+                probs_image=probs_image,
+                pre_softmax_audio=norm_logits_a,
+                pre_softmax_image=norm_logits_i,
                 return_gate=True
             )
             val_loss += ce_criterion(logits_f, y).item() * y.size(0)
@@ -130,16 +143,22 @@ for ep in range(1, epochs + 1):
             total += y.size(0)
             alpha_a_vals.extend(alpha[:, 0].detach().cpu().tolist())
             alpha_i_vals.extend(alpha[:, 1].detach().cpu().tolist())
+            gate_entropy = -(alpha * (torch.log(alpha + 1e-8))).sum(dim=1).mean()
+            val_entropy_sum += gate_entropy.item() * y.size(0)
+            val_entropy_count += y.size(0)
 
     val_loss /= len(val_loader.dataset)
     val_acc = correct / total
     mean_alpha_a = np.mean(alpha_a_vals) if alpha_a_vals else 0
     mean_alpha_i = np.mean(alpha_i_vals) if alpha_i_vals else 0
+    val_entropy = val_entropy_sum / val_entropy_count
 
     print(
         f"Ep {ep:03}: "
         f"train {train_loss:.4f} | val {val_loss:.4f} | acc {val_acc:.4f} "
-        f"| mean alpha_a {mean_alpha_a:.3f} | mean alpha_i {mean_alpha_i:.3f} | lr {scheduler.get_last_lr()[0]:.6f}"
+        f"| mean alpha_a {mean_alpha_a:.3f} | mean alpha_i {mean_alpha_i:.3f} "
+        f"| train_entropy {train_entropy:.4f} | val_entropy {val_entropy:.4f} "
+        f"| lr {scheduler.get_last_lr()[0]:.6f}"
     )
 
     if val_loss < best_val - 1e-5:
@@ -155,7 +174,3 @@ for ep in range(1, epochs + 1):
 if best_state:
     fusion_head.load_state_dict(best_state)
     print(f"Best model re-loaded (val loss {best_val:.4f}, acc {val_acc:.4f}).")
-
-        # ce = ce_criterion(logits_f, y)
-        # gate_entropy = -(alpha * (torch.log(alpha + 1e-8))).sum(dim=1).mean()
-        # loss = ce + lam_entropy * gate_entropy

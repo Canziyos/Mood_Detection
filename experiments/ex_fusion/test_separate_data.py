@@ -25,39 +25,41 @@ class_names = config["classes"]
 
 
 # Model paths: these point to the best/final models trained on our main data split.
-audio_model_path = config["models"]["audio_model"]
-image_model_path = config["models"]["image_model"]
+#audio_model_path = config["models"]["audio_model"]
+#image_model_path = config["models"]["image_model"]
 ckpt_path = config["models"]["gate"]
 
 
 # If you want to test models trained on CREMA-D, uncomment and use these paths instead:
 
-# img_trained_on_crema = config["models"]["img_trained_on_crema"]
-# aud_trained_on_crema = config["models"]["aud_trained_on_crema"]
+image_model_path = config["models"]["img_trained_on_crema"]
+audio_model_path = config["models"]["aud_trained_on_crema"]
 
 
 # By default, use our standard held-out test split.
-audio_root = config["data"]["aud_test_dir"]
-image_root = config["data"]["img_test_dir"]
+#audio_root = config["data"]["aud_test_dir"]
+#image_root = config["data"]["img_test_dir"]
 
 
 # If you want to test on external or cross-dataset test sets (emo_db audio, raf-db images etc.),
 # uncomment and use these lines instead:
-# audio_root = config["data"]["emo_db_test"]
-# image_root = config["data"]["raf_db_test"]
+audio_root = config["data"]["emo_db_test"]
+image_root = config["data"]["raf_db_test"]
 
 # Set exp_name to tag/label this run for later identification.
 # This name will be included in the output CSV file name,
 # so we can match each CSV with the experiment setup ('regular', 'corpos', 'crema', etc.).
 # this is to know which csv file is associated with this run
-exp_name = "regular"
+
+#exp_name = "regular"
 # exp_name = "corpos" 
+exp_name = "crema" 
 
 
 out_dir = config["results_dir"]["root"]
 
 # Fusion_type.
-fusion_type = "avg"   # "avg" or "gate".
+fusion_type = "gate"   # "avg" or "gate".
 alpha = 0.3   # used if fusion_type=="avg".
 
 os.makedirs(out_dir, exist_ok=True)
@@ -185,4 +187,4 @@ mean_i = np.mean(alpha_i_list) if alpha_i_list else 0
 print(f"\nalpha audio (mean): {mean_a:.3f}   |   alpha image (mean): {mean_i:.3f}")
 
 pd.DataFrame(records).to_csv(csv_path, index=False)
-print(f"\nResults written to {csv_path}")
+print(f"\nResults written to {csv_path}\n")

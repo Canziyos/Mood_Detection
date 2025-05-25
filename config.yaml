@@ -19,13 +19,14 @@ models:
   root: "models"
   audio_model: "models/mobilenetv2_aud.pth"
   image_model: "models/mobilenetv2_img.pth"
-  gate: "models/gate_normalized_logits.pth"
-  aud_trained_on_crema: "models/mobilenetv2_aud_TrainedOnCREMA_64.84"
-  img_trained_on_crema: "models/mobilenetv2_img_TrainedOnCREMA_76.41"
+  gate: "models/best_gate_normalized_logits.pth"
+  aud_trained_on_crema: "models/mobilenetv2_aud_TrainedOnCREMA_64.84.pth"
+  img_trained_on_crema: "models/mobilenetv2_img_TrainedOnCREMA_76.41.pth"
 
 results_dir:
   root: "results"
 
+# best hyperparams.
 training:
   batch_size: 32
   epochs: 150

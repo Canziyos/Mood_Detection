@@ -23,8 +23,8 @@ import numpy as np
 
 fusion_mode = "gate"  # "avg" or "gate"
 
-# Set the CSV path using the selected results_root and your naming convention
-csv_path = os.path.join(results_root, f"sync_fusion_results_{fusion_mode}.csv")
+# Set the CSV path using the selected results_root.
+csv_path = os.path.join(results_root, f"_fusion_results_{fusion_mode}.csv")
 df = pd.read_csv(csv_path)
 
 y_true = df['class']
@@ -74,12 +74,12 @@ plt.tight_layout()
 plt.savefig(os.path.join(results_root, f"cm_fusion_{fusion_mode}.png"))
 plt.show()
 
-cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
-plt.figure(figsize=(8, 6))
-sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
-plt.title(f"Normalized CM (Fusion: {fusion_mode})")
-plt.ylabel('True')
-plt.xlabel('Predicted')
-plt.tight_layout()
-plt.savefig(os.path.join(results_root, f"cm_fusion_normalized_{fusion_mode}.png"))
-plt.show()
+# cm_norm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+# plt.figure(figsize=(8, 6))
+# sns.heatmap(cm_norm, annot=True, fmt='.2f', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+# plt.title(f"Normalized CM (Fusion: {fusion_mode})")
+# plt.ylabel('True')
+# plt.xlabel('Predicted')
+# plt.tight_layout()
+# plt.savefig(os.path.join(results_root, f"cm_fusion_normalized_{fusion_mode}.png"))
+# plt.show()

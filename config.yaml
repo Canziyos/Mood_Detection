@@ -4,6 +4,7 @@ logits:
   val_aud_logits_dir: "logits/audio/val"
   val_img_logits_dir: "logits/images/val"
 
+
 data:
   aud_train_dir: "dataset/audio/train"
   img_train_dir: "dataset/images/train"
@@ -25,6 +26,7 @@ models:
 
 results_dir:
   root: "results"
+  reports : "results/reports"
 
 # best hyperparams.
 training:
@@ -72,3 +74,10 @@ normalization:
   aud_logits_std: 5.11
   img_logits_mean: -0.592
   img_logits_std: 1.58
+
+
+current_results:
+  test_subset_combined: "current_results/Results testing on 10% test-subset using Weights trained on Combined dataset"
+  test_subset_cremad: "current_results/Results testing on 10% test-subset using Weights trained on CREMA-D"
+  emodb_ravdess_combined: "current_results/Results testing on EMODB and RAVDESS using Weights trained on Comined dataset"
+  emodb_ravdess_cremad: "current_results/Results testing on EMODB and RAVDESS using Weights trained on CREMA-D"

@@ -1,12 +1,13 @@
-
 import sys
 import os
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-
-import torch, torchaudio, numpy as np, pandas as pd
+import torch
+import torchaudio
+import numpy as np
+import pandas as pd
 from sklearn.metrics import classification_report
 from utils import load_config
 from audio import load_audio_model, audio_to_tensor, audio_predict
@@ -17,29 +18,24 @@ config = load_config("config.yaml")
 
 # Normalization values (from config).
 aud_logits_mean = config["normalization"]["aud_logits_mean"]
-aud_logits_std  = config["normalization"]["aud_logits_std"]
+aud_logits_std = config["normalization"]["aud_logits_std"]
 img_logits_mean = config["normalization"]["img_logits_mean"]
-img_logits_std  = config["normalization"]["img_logits_std"]
+img_logits_std = config["normalization"]["img_logits_std"]
 
 class_names = config["classes"]
 
-
 # Model paths: these point to the best/final models trained on our main data split.
-#audio_model_path = config["models"]["audio_model"]
-#image_model_path = config["models"]["image_model"]
+audio_model_path = config["models"]["audio_model"]
+image_model_path = config["models"]["image_model"]
 ckpt_path = config["models"]["gate"]
 
-
 # If you want to test models trained on CREMA-D, uncomment and use these paths instead:
-
-image_model_path = config["models"]["img_trained_on_crema"]
-audio_model_path = config["models"]["aud_trained_on_crema"]
-
+# image_model_path = config["models"]["img_trained_on_crema"]
+# audio_model_path = config["models"]["aud_trained_on_crema"]
 
 # By default, use our standard held-out test split.
-#audio_root = config["data"]["aud_test_dir"]
-#image_root = config["data"]["img_test_dir"]
-
+# audio_root = config["data"]["aud_test_dir"]
+# image_root = config["data"]["img_test_dir"]
 
 # If you want to test on external or cross-dataset test sets (emo_db audio, raf-db images etc.),
 # uncomment and use these lines instead:
@@ -49,17 +45,14 @@ image_root = config["data"]["raf_db_test"]
 # Set exp_name to tag/label this run for later identification.
 # This name will be included in the output CSV file name,
 # so we can match each CSV with the experiment setup ('regular', 'corpos', 'crema', etc.).
-# this is to know which csv file is associated with this run
-
-#exp_name = "regular"
-# exp_name = "corpos" 
-exp_name = "crema" 
-
+exp_name = "our_regular"
+#exp_name = "our_cross_gated"
+# exp_name = "crema_cross_gated"
 
 out_dir = config["results_dir"]["root"]
 
 # Fusion_type.
-fusion_type = "gate"   # "avg" or "gate".
+fusion_type = "avg"   # "avg" or "gate".
 alpha = 0.3   # used if fusion_type=="avg".
 
 os.makedirs(out_dir, exist_ok=True)
@@ -121,12 +114,12 @@ with torch.no_grad():
             aud_t = audio_to_tensor(wav, sr)
             logits_a, probs_a, _, pred_a = audio_predict(audio_model, aud_t, device)
             logits_a = logits_a.to(device)
-            probs_a  = probs_a.to(device)
+            probs_a = probs_a.to(device)
 
             # Image forward.
             lab_i, probs_i, logits_i, _ = extract_image_features(os.path.join(i_dir, i_files[idx]))
             logits_i = torch.tensor(logits_i, dtype=torch.float32).to(device)
-            probs_i  = torch.tensor(probs_i,  dtype=torch.float32).to(device)
+            probs_i = torch.tensor(probs_i, dtype=torch.float32).to(device)
 
             # Normalize logits for gate.
             norm_logits_a = normalize_logits(logits_a, aud_logits_mean, aud_logits_std)
@@ -164,6 +157,7 @@ with torch.no_grad():
             alpha_a_list.append(alpha_weights[0, 0].item())
             alpha_i_list.append(alpha_weights[0, 1].item())
 
+            # Save all required columns (with fusion_mode and probabilities).
             records.append({
                 "class": cname,
                 "audio_file": a_files[idx],
@@ -171,8 +165,10 @@ with torch.no_grad():
                 "audio_pred": pred_a,
                 "image_pred": lab_i,
                 "fusion_pred": pred_f,
-                "alpha_audio": alpha_weights[0, 0].item(),
-                "alpha_image": alpha_weights[0, 1].item(),
+                "fusion_mode": fusion_type,
+                "audio_probs": probs_a.detach().cpu().numpy().tolist(),
+                "image_probs": probs_i.detach().cpu().numpy().tolist(),
+                "fusion_probs": fused_probs.detach().cpu().numpy().tolist()
             })
 
         print(f"[{cname}] paired {N} samples (audio {len(a_files)}/ image {len(i_files)})")

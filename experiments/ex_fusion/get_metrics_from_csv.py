@@ -21,10 +21,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 
-fusion_mode = "gate"  # "avg" or "gate"
+fusion_mode = "avg"  # "avg" or "gate"
 
 # Set the CSV path using the selected results_root.
-csv_path = os.path.join(results_root, f"_fusion_results_{fusion_mode}.csv")
+csv_path = "results/fusion_our_regular_avg_alpha0.5.csv"
 df = pd.read_csv(csv_path)
 
 y_true = df['class']
@@ -40,7 +40,7 @@ fusion_r = classification_report(y_true, y_pred_fusion)
 audio_r = classification_report(y_true, y_pred_audio)
 image_r = classification_report(y_true, y_pred_image)
 
-# Save metrics to a TXT file
+# Save metrics to a TXT file.
 metrics_txt = f"""
 Fusion acc: {fusion_acc:.4f}
 Audio-only acc: {audio_acc:.4f}

@@ -7,7 +7,7 @@ import torch
 import numpy as np
 import random
 from torch.utils.data import DataLoader
-from AudioImageFusion import AudioImageFusion
+from utils.AudioImageFusion_bi import AudioImageFusion
 from dataloader import FlexibleFusionDataset, ConflictValDataset
 from utils import load_config
 

@@ -10,9 +10,9 @@ import numpy as np
 import pandas as pd
 from sklearn.metrics import classification_report
 from utils import load_config
-from audio import load_audio_model, audio_to_tensor, audio_predict
-from image_model_interface import load_image_model, extract_image_features
-from AudioImageFusion import AudioImageFusion
+from experiments.ex_fusion.audio import load_audio_model, audio_to_tensor, audio_predict
+from experiments.ex_fusion.image_model_interface import load_image_model, extract_image_features
+from utils.AudioImageFusion_bi import AudioImageFusion
 
 config = load_config("config.yaml")
 
@@ -29,37 +29,33 @@ audio_model_path = config["models"]["audio_model"]
 image_model_path = config["models"]["image_model"]
 ckpt_path = config["models"]["gate"]
 
-# If you want to test models trained on CREMA-D, uncomment and use these paths instead:
+# If you don't want to test models trained on CREMA-D, do not uncomment or use these paths :😏
 # image_model_path = config["models"]["img_trained_on_crema"]
 # audio_model_path = config["models"]["aud_trained_on_crema"]
 
 # By default, use our standard held-out test split.
-# audio_root = config["data"]["aud_test_dir"]
-# image_root = config["data"]["img_test_dir"]
+audio_root = config["data"]["aud_test_dir"]
+image_root = config["data"]["img_test_dir"]
 
 # If you want to test on external or cross-dataset test sets (emo_db audio, raf-db images etc.),
 # uncomment and use these lines instead:
-audio_root = config["data"]["emo_db_test"]
-image_root = config["data"]["raf_db_test"]
+# audio_root = config["data"]["emo_db_test"]
+# image_root = config["data"]["raf_db_test"]
 
 # Set exp_name to tag/label this run for later identification.
 # This name will be included in the output CSV file name,
 # so we can match each CSV with the experiment setup ('regular', 'corpos', 'crema', etc.).
-exp_name = "our_regular"
-#exp_name = "our_cross_gated"
+# exp_name = "regular"
+exp_name = "our_cross_gated"
 # exp_name = "crema_cross_gated"
 
 out_dir = config["results_dir"]["root"]
 
 # Fusion_type.
-fusion_type = "avg"   # "avg" or "gate".
-alpha = 0.3   # used if fusion_type=="avg".
+fusion_type = "gate"   # This script, now, is for gate only.
 
 os.makedirs(out_dir, exist_ok=True)
-if fusion_type == "gate":
-    csv_path = f"{out_dir}/fusion_{exp_name}_{fusion_type}.csv"
-else:
-    csv_path = f"{out_dir}/fusion_{exp_name}_{fusion_type}_alpha{alpha}.csv"
+csv_path = f"{out_dir}/fusion_{exp_name}_{fusion_type}.csv"
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Audio and image backbones loaded.")
@@ -67,25 +63,15 @@ print("Audio and image backbones loaded.")
 audio_model, _ = load_audio_model(model_path=audio_model_path)
 image_model = load_image_model(model_path=image_model_path)
 
-# Load fusion model according to mode.
-if fusion_type == "avg":
-    fusion_head = AudioImageFusion(
-        num_classes=len(class_names),
-        fusion_mode="avg",
-        alpha=alpha
-    ).to(device)
-    print(f"FusionAV loaded for avg fusion (alpha={alpha}).")
-elif fusion_type == "gate":
-    ckpt = torch.load(ckpt_path, map_location="cpu")
-    fusion_head = AudioImageFusion(
-        num_classes=len(class_names),
-        fusion_mode="gate"
-    ).to(device)
-    fusion_head.load_state_dict(ckpt["state_dict"])
-    fusion_head.eval()
-    print("Gate head loaded.")
-else:
-    raise ValueError(f"Unknown fusion_type: {fusion_type}")
+# Load gate fusion model.
+ckpt = torch.load(ckpt_path, map_location="cpu")
+fusion_head = AudioImageFusion(
+    num_classes=len(class_names),
+    fusion_mode="gate"
+).to(device)
+fusion_head.load_state_dict(ckpt["state_dict"])
+fusion_head.eval()
+print("Gate head loaded.")
 
 def normalize_logits(logits, mean, std):
     return (logits - mean) / std
@@ -126,26 +112,15 @@ with torch.no_grad():
             norm_logits_i = normalize_logits(logits_i, img_logits_mean, img_logits_std)
 
             # Fuse.
-            if fusion_type == "avg":
-                fused_probs = fusion_head.fuse_probs(
-                    probs_audio=probs_a,
-                    probs_image=probs_i,
-                    pre_softmax_audio=logits_a,
-                    pre_softmax_image=logits_i
-                )
-                alpha_weights = torch.tensor([[fusion_head.alpha, 1-fusion_head.alpha]])
-            elif fusion_type == "gate":
-                fused_probs, alpha = fusion_head.fuse_probs(
-                    probs_audio=probs_a,
-                    probs_image=probs_i,
-                    pre_softmax_audio=norm_logits_a,
-                    pre_softmax_image=norm_logits_i,
-                    return_gate=True
-                )
-                alpha_a, alpha_i = alpha[:, 0], alpha[:, 1]
-                alpha_weights = torch.stack([alpha_a, alpha_i], dim=1)
-            else:
-                raise ValueError(f"Unknown fusion_type: {fusion_type}")
+            fused_probs, alpha = fusion_head.fuse_probs(
+                probs_audio=probs_a,
+                probs_image=probs_i,
+                pre_softmax_audio=norm_logits_a,
+                pre_softmax_image=norm_logits_i,
+                return_gate=True
+            )
+            alpha_a, alpha_i = alpha[:, 0], alpha[:, 1]
+            alpha_weights = torch.stack([alpha_a, alpha_i], dim=1)
 
             pred_f = class_names[torch.argmax(fused_probs).item()]
 

@@ -8,7 +8,7 @@ import cv2, torch, numpy as np
 import sounddevice as sd
 from PIL import Image
 from torchvision import transforms
-from utils import load_config
+from utils.utils import load_config
 from audio import load_audio_model, audio_to_tensor, audio_predict
 from image_model_interface import load_image_model, extract_image_features
 from AudioImageFusion import AudioImageFusion

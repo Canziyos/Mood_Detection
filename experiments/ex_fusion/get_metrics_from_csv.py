@@ -4,7 +4,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from utils import load_config
+from utils.utils import load_config
 
 config = load_config("config.yaml")
 results_folders = config["current_results"]
@@ -24,7 +24,7 @@ import numpy as np
 fusion_mode = "avg"  # "avg" or "gate"
 
 # Set the CSV path using the selected results_root.
-csv_path = "results/fusion_our_regular_avg_alpha0.5.csv"
+csv_path = "results/fusion_our_regular_avg_alpha0.6.csv"
 df = pd.read_csv(csv_path)
 
 y_true = df['class']

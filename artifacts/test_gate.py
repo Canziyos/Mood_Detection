@@ -9,7 +9,7 @@ import torchaudio
 import numpy as np
 import pandas as pd
 from sklearn.metrics import classification_report
-from utils import load_config
+from utils.utils import load_config
 from experiments.ex_fusion.audio import load_audio_model, audio_to_tensor, audio_predict
 from experiments.ex_fusion.image_model_interface import load_image_model, extract_image_features
 from utils.AudioImageFusion_bi import AudioImageFusion

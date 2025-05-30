@@ -8,7 +8,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
-from utils import load_config
+from utils.utils import load_config
 from audio import load_audio_model, audio_to_tensor, audio_predict
 from image_model_interface import load_image_model, extract_image_features
 from utils.AudioImageFusion_bi import AudioImageFusion

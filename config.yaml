@@ -1,24 +1,21 @@
 logits:
-  train_aud_logits_dir: "logits/audio/train"
-  train_img_logits_dir: "logits/images/train"
-  val_aud_logits_dir: "logits/audio/val"
-  val_img_logits_dir: "logits/images/val"
+  #train_aud_logits_dir: "logits/audio/train"
+  #train_img_logits_dir: "logits/images/train"
+  #val_aud_logits_dir: "logits/audio/val"
+  #val_img_logits_dir: "logits/images/val"
 
 
 data:
-  #aud_train_dir: "dataset/audio/train"
-  #img_train_dir: "dataset/images/train"
-  #aud_test_dir: "C:/Users/Dator/Downloads/Test_spectrogram_images/test_spectrogram_images_EmoDB"
+  aud_train_dir: "dataset/audio/train"
+  img_train_dir: "dataset/images/train"
   #aud_test_dir: "dataset/audio/test"
   #img_test_dir: "dataset/images/test"
   #aud_val_dir: "dataset/audio/val"
   #img_val_dir: "dataset/images/val"
 
-  #emo_db_test: "dataset/audio/emo_db_test"
-  #raf_db_test: "dataset/images/raf_db_test"
 
   #img_train_dir: "C:/Projects/GitHub_projects/Experimental_Mood_Detection/dataset/images/train"
-  #aud_test_dir: "C:/Projects/GitHub_projects/Experimental_Mood_Detection/dataset/audio/train"
+  #aud_train_dir: "C:/Projects/GitHub_projects/Experimental_Mood_Detection/dataset/audio/train"
   img_test_dir: "C:/Users/Dator/Downloads/Weights_and_data_for_test/Weights_and_data_for_test/RAVDESS_for_faceimg_test"
   aud_test_dir: "C:/Users/Dator/Downloads/Weights_and_data_for_test/Weights_and_data_for_test/EmoDB_for_specimg_test"
   #aud_val_dir: "C:/Projects/GitHub_projects/Experimental_Mood_Detection/dataset/audio/val"
@@ -27,13 +24,15 @@ data:
 
 models:
   root: "models"
-  #audio_model: "models/mobilenetv2_aud.pth"
-  audio_model: "models/mobilenetv2_aud_TrainedOnFullDataset_71.09.pth"
-  #image_model: "models/mobilenetv2_img.pth"
-  image_model: "models/mobilenetv2_img_TrainedOnFullDataset_70.79.pth"
-  gate: "models/best_gate_normalized_logits.pth"
-  aud_trained_on_crema: "models/mobilenetv2_aud_TrainedOnCREMA_64.84.pth"
-  img_trained_on_crema: "models/mobilenetv2_img_OnlyTrainedOnCREMA_72.53.pth"
+  audio_model: "models/mobilenetv2_aud_full_dataset_71.09.pth"
+  image_model: "models/mobilenetv2_img_full_dataset_70.79.pth"
+
+  aud_quant_model: "models/mobilenetv2_audio_quantized.pt"
+  img_quant_model: "models/mobilenetv2_image_quantized.pt"
+
+  #gate: "models/best_gate_normalized_logits.pth"
+  #aud_trained_on_crema: "models/mobilenetv2_aud_TrainedOnCREMA_64.84.pth"
+  #img_trained_on_crema: "models/mobilenetv2_img_OnlyTrainedOnCREMA_72.53.pth"
 
 results_dir:
   root: "results"

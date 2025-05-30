@@ -5,38 +5,43 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 import torch
-import torchaudio
 import numpy as np
 import pandas as pd
 from sklearn.metrics import classification_report
-from utils import load_config
-from audio import load_audio_model, audio_predict
+from utils.utils import load_config
+from audio import load_audio_model, spectrogram_image_to_tensor,audio_predict, load_quant_aud_model
 from image_model_interface import load_image_model, extract_image_features
-from AudioImageFusion import AudioImageFusion  # Only needs avg support
+from AudioImageFusion import AudioImageFusion
 
 config = load_config("config.yaml")
-
 class_names = config["classes"]
 
-audio_model_path = config["models"]["audio_model"]
-image_model_path = config["models"]["image_model"]
+# Choose model type.
+use_quantized = False
+
+if use_quantized:
+    audio_model_path = config["models"]["aud_quant_model"]
+    image_model_path = config["models"]["img_quant_model"]
+    audio_model, _ = load_quant_aud_model(model_path=audio_model_path)
+    image_model = load_image_model(model_path=image_model_path, quantized=True)
+    device = torch.device("cpu")
+else:
+    audio_model_path = config["models"]["audio_model"]
+    image_model_path = config["models"]["image_model"]
+    audio_model, device = load_audio_model(model_path=audio_model_path)
+    image_model = load_image_model(model_path=image_model_path)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 audio_root = config["data"]["aud_test_dir"]
 image_root = config["data"]["img_test_dir"]
 exp_name = "our_regular"
-#exp_name = "our_cross_avg"
 alpha = 0.6
 
 out_dir = config["results_dir"]["root"]
 os.makedirs(out_dir, exist_ok=True)
 csv_path = f"{out_dir}/fusion_{exp_name}_avg_alpha{alpha}.csv"
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print("Audio and image backbones loaded.")
-
-audio_model, _ = load_audio_model(model_path=audio_model_path)
-image_model = load_image_model(model_path=image_model_path)
-
 fusion_head = AudioImageFusion(num_classes=len(class_names), alpha=alpha).to(device)
 print(f"Fusion loaded (alpha={alpha}).")
 
@@ -58,12 +63,14 @@ with torch.no_grad():
             continue
 
         for idx in range(N):
-            #wav, sr = torchaudio.load(os.path.join(a_dir, a_files[idx]))
-            #aud_t = audio_to_tensor(wav, sr)
-            _, probs_a, _, pred_a = audio_predict(audio_model, os.path.join(a_dir, a_files[idx]), device)
+            aud_t = spectrogram_image_to_tensor(os.path.join(a_dir, a_files[idx]))
+            _, probs_a, _, pred_a = audio_predict(audio_model, aud_t, device)
             probs_a = probs_a.to(device)
 
-            lab_i, probs_i, _, _ = extract_image_features(os.path.join(i_dir, i_files[idx]))
+            if use_quantized:
+                lab_i, probs_i, _, _ = extract_image_features(os.path.join(i_dir, i_files[idx]), quantized=True)
+            else:
+                lab_i, probs_i, _, _ = extract_image_features(os.path.join(i_dir, i_files[idx]))
             probs_i = torch.tensor(probs_i, dtype=torch.float32).to(device)
 
             fused_probs = fusion_head.fuse_probs(

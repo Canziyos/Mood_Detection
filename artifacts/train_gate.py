@@ -9,7 +9,7 @@ import random
 from torch.utils.data import DataLoader
 from utils.AudioImageFusion_bi import AudioImageFusion
 from dataloader import FlexibleFusionDataset, ConflictValDataset
-from utils import load_config
+from utils.utils import load_config
 
 config = load_config("config.yaml")
 

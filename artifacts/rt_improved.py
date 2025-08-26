@@ -26,7 +26,7 @@ fusion_head = AudioImageFusion(num_classes=len(class_names), alpha=alpha).to(dev
 
 cap = cv2.VideoCapture(0)
 SAMPLE_RATE = 16000
-AUDIO_WIN_S = 0.3  # Reduced window for less latency
+AUDIO_WIN_S = 0.3  # Reduced window (less latency).
 AUDIO_WIN_SAMPLES = int(SAMPLE_RATE * AUDIO_WIN_S)
 
 transform = transforms.Compose([

@@ -28,7 +28,7 @@ fusion_type = config["demo"]["fusion_type"]  # "avg" or "gate"
 alpha = config["demo"].get("alpha", 0.3)
 audio_win_s = config["demo"].get("audio_window", 1.0)
 
-# === Use ffmpeg to extract clean audio ===
+# === ffmpeg to extract clean audio ===
 def extract_audio_ffmpeg(video_path, output_path, sr=16000):
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
     cmd = ["ffmpeg", "-y", "-i", video_path, "-vn", "-ac", "1", "-ar", str(sr), "-f", "wav", output_path]
@@ -105,7 +105,7 @@ for t_sec in np.arange(0.25, duration, 0.5):
 
     frame_start = int((t_sec - 0.25) * fps)
     frame_end = int((t_sec + 0.25) * fps)
-    frame_indices = list(range(frame_start, frame_end + 1))  # Use all frames in the 0.5s window
+    frame_indices = list(range(frame_start, frame_end + 1))  # all frames in the 0.5s window
 
     image_probs_list = []
     logits_i_list = []

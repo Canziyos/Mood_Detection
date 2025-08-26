@@ -45,7 +45,7 @@ with torch.no_grad():
 
 torch.quantization.convert(audio_model, inplace=True)
 
-# Always save using torch.save(model, ...) not state_dict for quantized
+# save using torch.save(model, ...) not state_dict for quantized.
 torch.save(audio_model, "models/mobilenetv2_audio_quantized.pt")
 print("Static quantization complete for audio model.")
 

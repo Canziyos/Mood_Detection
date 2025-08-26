@@ -3,7 +3,7 @@
 
 This folder contains preprocessing utilities for working with the AFEW-VA dataset — a valence-arousal annotated video database of facial expressions in the wild.
 
-The dataset I downloaded is already processed in the sense that each video has been converted into image frames. However, the goal of this preprocessing pipeline is to: pipeline is to:
+The dataset I downloaded is already processed in the sense that each video has been converted into image frames. However, the goal of this preprocessing pipeline is to:
 - Remove unnecessary cropped folders.
 - Clean JSON annotations.
 - Extract 5 representative images per subject (actor) with valence-arousal values.

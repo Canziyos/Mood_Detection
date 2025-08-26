@@ -34,7 +34,7 @@ for root, _, files in os.walk(VIDEO_ROOT):
         flat_path = relative_path.replace(os.sep, "_").replace(" ", "")
         segment_id = f"{flat_path}_{fname[:-4]}"  # e.g., subject1_s1_an_1
 
-        # Prepare output path
+        #  output path
         out_folder = os.path.join(AUDIO_OUTPUT, emotion)
         os.makedirs(out_folder, exist_ok=True)
         audio_path = os.path.join(out_folder, f"{segment_id}.wav")

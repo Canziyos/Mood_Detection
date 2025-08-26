@@ -15,19 +15,19 @@ config = load_config("config.yaml")
 
 aud_logits_train_dir = config["logits"]["train_aud_logits_dir"]
 img_logits_train_dir = config["logits"]["train_img_logits_dir"]
-aud_logits_val_dir   = config["logits"]["val_aud_logits_dir"]
-img_logits_val_dir   = config["logits"]["val_img_logits_dir"]
-results_dir          = config["models"]["root"]
+aud_logits_val_dir = config["logits"]["val_aud_logits_dir"]
+img_logits_val_dir = config["logits"]["val_img_logits_dir"]
+results_dir = config["models"]["root"]
 
 training_cfg = config["training"]
-batch_size        = training_cfg["batch_size"]
-epochs            = training_cfg["epochs"]
-patience          = training_cfg["patience"]
-lr                = training_cfg["lr"]
+batch_size = training_cfg["batch_size"]
+epochs = training_cfg["epochs"]
+patience = training_cfg["patience"]
+lr = training_cfg["lr"]
 oversample_audio  = training_cfg["oversample_audio"]
-frac_conflict     = training_cfg["frac_conflict"]
-lam_kl            = training_cfg.get("lam_kl", 0.0)
-lam_entropy       = training_cfg.get("lam_entropy", 0.0)
+frac_conflict = training_cfg["frac_conflict"]
+lam_kl = training_cfg.get("lam_kl", 0.0)
+lam_entropy = training_cfg.get("lam_entropy", 0.0)
 
 class_names = config["classes"]
 num_classes = len(class_names)

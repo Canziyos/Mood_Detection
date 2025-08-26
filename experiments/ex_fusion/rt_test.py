@@ -61,7 +61,7 @@ while True:
 
     frame_count += 1
 
-    # Only do prediction every 'frame_skip' frames for speed
+    # Only do prediction every 'frame_skip' frames for speed.
     if frame_count % frame_skip == 0:
         # Central crop and resize
         h, w, _ = frame.shape

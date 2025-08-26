@@ -29,7 +29,7 @@ audio_model_path = config["models"]["audio_model"]
 image_model_path = config["models"]["image_model"]
 ckpt_path = config["models"]["gate"]
 
-# If you don't want to test models trained on CREMA-D, do not uncomment or use these paths :😏
+# If you don't want to test models trained on CREMA-D, do not uncomment or use these paths :
 # image_model_path = config["models"]["img_trained_on_crema"]
 # audio_model_path = config["models"]["aud_trained_on_crema"]
 

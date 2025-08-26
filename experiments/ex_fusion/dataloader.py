@@ -109,7 +109,7 @@ class FlexibleFusionDataset(Dataset):
         if buf.get("la") is not None:   # real audio latent exists.
             latent_a = torch.as_tensor(buf["la"][a_idx], dtype=torch.float32)
 
-        else:                                               # logits-only run
+        else:                                               # logits-only run.
             latent_a = torch.zeros(1, dtype=torch.float32)  # 1-D dummy.
 
         if buf.get("li") is not None:                       # real image latent exists.

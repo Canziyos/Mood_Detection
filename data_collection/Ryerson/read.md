@@ -3,7 +3,7 @@
 In this folder, you’ll find everything related to preparing the **Ryerson Multimedia Lab Emotion Database (RML)**.  
 The dataset contains short audio-visual clips (around 5 seconds each) of subjects expressing six basic emotions across multiple languages and accents.  
 
-All selected samples are validated by human listeners who didn’t speak the languages, ensuring that **perceived emotion** matched the intended label. Neat :)
+All selected samples are validated by listeners who didn’t speak the languages, ensuring that **perceived emotion** matched the intended label. Neat :)
 ---
 
 ### Dataset Overview

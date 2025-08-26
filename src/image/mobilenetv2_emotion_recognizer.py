@@ -19,12 +19,12 @@ class MobileNetV2EmotionRecognizer:
 
         # === Data Augmentation for Robustness ===
         self.transform = transforms.Compose([
-            transforms.Resize((256, 256)),  # Resize to a slightly larger size
-            transforms.RandomCrop(224),     # Then crop to 224x224 as expected by MobileNetV2
+            transforms.Resize((256, 256)),  # Resize to a slightly larger size.
+            transforms.RandomCrop(224),     # Then crop to 224x224 as expected by MobileNetV2.
             transforms.RandomHorizontalFlip(p=0.5),  # Adds variability, especially for facial symmetry
             transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.05),  # Color variability
             transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406],  # Standard ImageNet normalization for RGB
+            transforms.Normalize(mean=[0.485, 0.456, 0.406],  # Standard ImageNet normalization for RGB.
                                  std=[0.229, 0.224, 0.225])
         ])
 
@@ -32,7 +32,7 @@ class MobileNetV2EmotionRecognizer:
         self.class_names = ["Angry", "Disgust", "Fear", "Happy", "Neutral", "Sad"]
         self.num_classes = len(self.class_names)
 
-         # Only prepare data if training is needed
+         # Only prepare data if training is needed.
         if self.data_dir and self.data_dir != "dummy":
          self._prepare_data()
 
@@ -40,7 +40,7 @@ class MobileNetV2EmotionRecognizer:
         self._build_model()
 
     def _prepare_data(self):
-        # Load dataset and apply transformations
+        # Load dataset and apply transformations.
         dataset = datasets.ImageFolder(self.data_dir, transform=self.transform)
         self.class_names = dataset.classes
         self.num_classes = len(self.class_names)
@@ -75,7 +75,7 @@ class MobileNetV2EmotionRecognizer:
         # AdamW is preferred over Adam for regularization
         self.optimizer = optim.AdamW(self.model.parameters(), lr=self.lr, weight_decay=1e-4)
 
-        # Cosine learning rate schedule helps avoid getting stuck in bad local minima
+        # Cosine learning rate schedule helps avoid getting stuck in bad local minima.
         self.scheduler = optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=10)
 
     def train(self, epochs=25):
@@ -101,7 +101,7 @@ class MobileNetV2EmotionRecognizer:
 
             self.scheduler.step()
 
-            # Early stopping based on validation accuracy
+            # Early stopping based on validation accuracy.
             if val_acc > best_acc:
                 best_acc = val_acc
                 patience_counter = 0
@@ -128,7 +128,7 @@ class MobileNetV2EmotionRecognizer:
                 y_true.extend(labels.cpu().numpy())
                 y_pred.extend(preds.cpu().numpy())
 
-        # Display standard classification metrics
+        # Display standard classification metrics.
         print("Confusion Matrix:")
         print(confusion_matrix(y_true, y_pred))
         print("Classification Report:")
@@ -156,7 +156,7 @@ class MobileNetV2EmotionRecognizer:
         """
         from PIL import Image
 
-        # Load and prepare the image
+        # Load and prepare the image.
         if isinstance(image_input, str):
             image = Image.open(image_input)
         elif isinstance(image_input, np.ndarray):

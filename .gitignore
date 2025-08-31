@@ -197,9 +197,13 @@ cython_debug/
 logs/
 debug_outputs/
 emo_env/
-
+EmoDB_For_AudioTest/
 # exclude some files.
 results/*
 # not these:
 !results/*.png
 !results/*.txt
+
+models/*
+!models/gate_normalized_logits.pth
+utils/*

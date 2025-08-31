@@ -2,7 +2,7 @@
 
 To extract features for fusion from the trained image model, use the `image_model_interface.py`.
 
-Note: Trained model is available on [\[OneDrive link\] ](https://studentmdh-my.sharepoint.com/:f:/r/personal/lpc24001_student_mdu_se/Documents/MoodDetection_Image_Model?csf=1&web=1&e=X2xPBQ) — not included in the repo.
+Note: Trained model is available soon, on [\[OneDrive link\] ]() — not included in the repo.
  
 ### Example Usage
 

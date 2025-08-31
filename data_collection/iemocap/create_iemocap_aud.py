@@ -2,8 +2,7 @@ import os
 import shutil
 import re
 
-# According to the README, in the current folder, set the proper paths below.
-
+# According to the README, in the current folder, set the paths below.
 
 # Define the root directory containing all emotion evaluation TXT files.
 EVAL_DIR = r"path_to_your\emoevaluation"

@@ -1,0 +1,80 @@
+logits:
+  #train_aud_logits_dir: "logits/audio/train"
+  #train_img_logits_dir: "logits/images/train"
+  #val_aud_logits_dir: "logits/audio/val"
+  #val_img_logits_dir: "logits/images/val"
+
+
+data:
+  aud_train_dir: "dataset/audio/train"
+  img_train_dir: "dataset/images/train"
+  #aud_test_dir: "dataset/audio/test"
+  #img_test_dir: "dataset/images/test"
+  #aud_val_dir: "dataset/audio/val"
+  #img_val_dir: "dataset/images/val"
+
+
+  #img_train_dir: "C:/Projects/GitHub_projects/Experimental_Mood_Detection/dataset/images/train"
+  #aud_train_dir: "C:/Projects/GitHub_projects/Experimental_Mood_Detection/dataset/audio/train"
+  img_test_dir: "C:/Users/Dator/Downloads/Weights_and_data_for_test/Weights_and_data_for_test/RAVDESS_for_faceimg_test"
+  aud_test_dir: "C:/Users/Dator/Downloads/Weights_and_data_for_test/Weights_and_data_for_test/EmoDB_for_specimg_test"
+  #aud_val_dir: "C:/Projects/GitHub_projects/Experimental_Mood_Detection/dataset/audio/val"
+  #img_val_dir: "C:/Projects/GitHub_projects/Experimental_Mood_Detection/dataset/images/val"
+
+
+models:
+  root: "models"
+  audio_model: "models/mobilenetv2_aud_full_dataset_71.09.pth"
+  image_model: "models/mobilenetv2_img_full_dataset_70.79.pth"
+
+  aud_quant_model: "models/mobilenetv2_audio_quantized.pt"
+  img_quant_model: "models/mobilenetv2_image_quantized.pt"
+
+  #gate: "models/best_gate_normalized_logits.pth"
+  #aud_trained_on_crema: "models/mobilenetv2_aud_TrainedOnCREMA_64.84.pth"
+  #img_trained_on_crema: "models/mobilenetv2_img_OnlyTrainedOnCREMA_72.53.pth"
+
+results_dir:
+  root: "results"
+  reports : "results/reports"
+
+# best hyperparams.
+training:
+  batch_size: 32
+  epochs: 150
+  patience: 15
+  lr: 0.0001
+  oversample_audio: false
+  frac_conflict: 0.0
+  lam_kl: 0.01
+
+
+classes:
+  - Angry
+  - Disgust
+  - Fear
+  - Happy
+  - Neutral
+  - Sad
+
+normalization:
+  aud_logits_mean: -2.953
+  aud_logits_std: 5.11
+  img_logits_mean: -0.592
+  img_logits_std: 1.58
+
+
+current_results:
+  test_subset_combined: "current_results/Results testing on 10% test-subset using Weights trained on Combined dataset"
+  test_subset_cremad: "current_results/Results testing on 10% test-subset using Weights trained on CREMA-D"
+  emodb_ravdess_combined: "current_results/Results testing on EMODB and RAVDESS using Weights trained on Comined dataset"
+  emodb_ravdess_cremad: "current_results/Results testing on EMODB and RAVDESS using Weights trained on CREMA-D"
+
+demo:
+  video_clip: "C:/Users/Dator/Pictures/Camera Roll/1.mp4"
+  #video_clip: "experiments/test_samples/4.mp4"
+  csv_out: "results/clip_fusion.csv"
+  fusion_type: "avg"
+  alpha : 0.5
+  frames: 10
+  audio_window: 1.0
